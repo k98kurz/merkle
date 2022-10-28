@@ -1,3 +1,4 @@
+from hashlib import sha256
 from context import classes, interfaces
 import unittest
 
@@ -13,6 +14,70 @@ class TestMerkle(unittest.TestCase):
 
     def test_Tree_implements_TreeProtocol(self):
         assert issubclass(classes.Tree, interfaces.TreeProtocol)
+
+    def test_Tree_joins_left_and_right_into_root(self):
+        left = sha256(b'hello').digest()
+        right = sha256(b'world').digest()
+        joined = sha256(left + right).digest()
+        tree = classes.Tree(left, right)
+
+        assert hasattr(tree, 'root')
+        assert type(tree.root) is bytes
+        assert tree.root == joined
+
+    def test_Tree_from_leaves_hashes_and_joins_leaves(self):
+        leaves = [b'hello', b'world']
+        left_hash = sha256(leaves[0]).digest()
+        right_hash = sha256(leaves[1]).digest()
+        root = sha256(left_hash + right_hash).digest()
+
+        assert hasattr(classes.Tree, 'from_leaves')
+        tree = classes.Tree.from_leaves(leaves)
+        assert tree.left == left_hash
+        assert tree.right == right_hash
+        assert tree.root == root
+
+    def test_Tree_from_leaves_asserts_at_least_two_leaves(self):
+        with self.assertRaises(AssertionError) as e:
+            classes.Tree.from_leaves([b'123'])
+        assert str(e.exception) == 'must have at least 2 leaves'
+
+    def test_Tree_from_leaves_joins_any_number_of_leaves(self):
+        roots = set()
+
+        for i in range(2, 1000):
+            leaves = [i.to_bytes(2, 'big') for _ in range(i)]
+            tree = classes.Tree.from_leaves(leaves)
+            assert tree.root not in roots
+            roots.add(tree.root)
+
+    def test_Tree_instance_serializes_to_dict(self):
+        tree = classes.Tree(b'left', b'right')
+        assert hasattr(tree, 'to_dict') and callable(tree.to_dict)
+        serialized = tree.to_dict()
+        assert type(serialized) is dict
+
+    def test_Tree_from_dict_unserializes_and_returns_instance(self):
+        tree = classes.Tree(b'left', b'right')
+        serialized = tree.to_dict()
+        assert hasattr(classes.Tree, 'from_dict')
+        deserialized = classes.Tree.from_dict(serialized)
+        assert type(deserialized) is classes.Tree
+        assert tree == deserialized
+
+    def test_Tree_instance_serializes_to_json(self):
+        tree = classes.Tree(b'left', b'right')
+        assert hasattr(tree, 'to_json') and callable(tree.to_json)
+        serialized = tree.to_json()
+        assert type(serialized) is str
+
+    def test_Tree_from_json_unserializes_and_returns_instance(self):
+        tree = classes.Tree(b'left', b'right')
+        serialized = tree.to_json()
+        assert hasattr(classes.Tree, 'from_json')
+        deserialized = classes.Tree.from_json(serialized)
+        assert type(deserialized) is classes.Tree
+        assert tree == deserialized
 
 
 if __name__ == '__main__':

@@ -17,7 +17,25 @@ class TreeProtocol(Protocol):
         """Return the root, left, and right in hexadecimal recursively."""
         ...
 
+    def to_dict(self) -> dict:
+        """Serialize to a dict."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize to json."""
+        ...
+
     @classmethod
     def from_leaves(cls, leaves: list[bytes]) -> TreeProtocol:
         """Return a full Tree constructed from the leaves."""
+        ...
+
+    @classmethod
+    def from_dict(cls, data: dict) -> TreeProtocol:
+        """Deserialize from a dict and return an instance."""
+        ...
+
+    @classmethod
+    def from_json(cls, data: str) -> TreeProtocol:
+        """Deserialize from json and return an instance."""
         ...
