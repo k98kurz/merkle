@@ -8,9 +8,9 @@ details.
 # Status
 
 - [x] Interface
-- [x] Red
-- [x] Green
-- [x] Refactor
+- [x] Basic Tests
+- [x] Basic Implementation
+- [ ] Proofs
 
 # Installation
 
