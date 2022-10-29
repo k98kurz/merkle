@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -39,3 +40,22 @@ class TreeProtocol(Protocol):
     def from_json(cls, data: str) -> TreeProtocol:
         """Deserialize from json and return an instance."""
         ...
+
+    def prove(self, leaf: bytes) -> dict:
+        """Create an inclusion proof for a leaf."""
+        ...
+
+    @staticmethod
+    def verify(root: bytes, leaf: bytes) -> None:
+        """Verify an inclusion proof is valid. Throws AssertionError upon
+            failure on any step or on invalid input.
+        """
+        ...
+
+
+class ProofOp(Enum):
+    load_left = b'\x00'
+    load_right = b'\x01'
+    hash_left = b'\x02'
+    hash_right = b'\x03'
+    hash_final = b'\x04'
