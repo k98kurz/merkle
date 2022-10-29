@@ -24,6 +24,11 @@ There is just one test file. Run it with the following:
 python tests/test_classes.py
 ```
 
+This file demonstrates all the intended behaviors of the class and rules out
+many unintended behaviors. It uses `randint` and many repetitions to ensure that
+the test is thorough. The tests are also a form of technical documentation; any
+questions about the code can likely be answered by reading through them.
+
 # Usage
 
 Usage examples are shown below.
