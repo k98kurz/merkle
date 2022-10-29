@@ -1,9 +1,8 @@
 from __future__ import annotations
 from hashlib import sha256
-import json
-from typing import Any, Optional
-
 from merkle.interfaces import ProofOp
+from typing import Any, Optional
+import json
 
 
 class Tree:
