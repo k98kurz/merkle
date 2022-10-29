@@ -174,8 +174,9 @@ class Tree:
 
     @staticmethod
     def verify(root: bytes, leaf: bytes, proof: list[bytes]) -> None:
-        """Verify an inclusion proof is valid. Throws AssertionError upon
-            failure on any step or on invalid input.
+        """Verify an inclusion proof is valid. Raises AssertionError upon
+            failure on any step. Raises AssertionError or ValueError on
+            invalid input.
         """
         # preconditions
         assert type(root) is bytes and len(root) == 32, 'root must be 32 bytes'

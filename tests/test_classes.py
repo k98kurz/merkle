@@ -159,6 +159,12 @@ class TestMerkle(unittest.TestCase):
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == 'proof does not reference root'
 
+        with self.assertRaises(ValueError) as e:
+            wrong_proof = [*proof]
+            wrong_proof[1] = b'\x99' + wrong_proof[1]
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
+
 
 if __name__ == '__main__':
     unittest.main()
