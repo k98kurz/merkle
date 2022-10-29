@@ -165,6 +165,20 @@ class TestMerkle(unittest.TestCase):
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
 
+    def test_e2e_arbitrary_branching(self):
+        leaves = [sha256(n.to_bytes(2, 'big')).digest() for n in range(13)]
+
+        tree = classes.Tree(leaves[0], leaves[1])
+        for i in range(2, len(leaves)):
+            if randint(0, 1) == 0:
+                tree = classes.Tree(tree, leaves[i])
+            else:
+                tree = classes.Tree(leaves[i], tree)
+
+        leaf = leaves[randint(0, len(leaves)-1)]
+        proof = tree.prove(leaf)
+        classes.Tree.verify(tree.root, leaf, proof)
+
 
 if __name__ == '__main__':
     unittest.main()
