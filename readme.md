@@ -78,6 +78,48 @@ serialized = tree.to_json()
 deserialized = Tree.from_json(serialized)
 ```
 
+## prove
+
+Inclusion proofs can be generated using the `prove` method:
+
+```py
+from merkle import Tree
+
+tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
+proof = tree.prove(b'leaf2')
+```
+
+Each inclusion proof is a list of bytes, where the first byte in each item in
+the list is one of the codes from `interfaces.ProofOp`.
+
+## verify
+
+Inclusion proofs can be verified using `Tree.verify`:
+
+```py
+from merkle import Tree
+
+tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
+leaf = b'leaf1'
+proof = tree.prove(b'leaf2')
+
+try:
+    Tree.verify(tree.root, leaf, proof)
+except ValueError as e:
+    print('invalid proof supplied')
+except AssertionError as e:
+    print(f'error encountered: {e}')
+```
+
+This static method parses the proof, interpreting the first byte in each proof
+step as a code from `interfaces.ProofOp`. It ensures that the proof starts with
+the leaf and ends with the root, and then it follows the proof operations.
+
+If the call to `Tree.verify` is provided invalid parameters or an invalid proof,
+it will throw an `AssertionError` or `ValueError`. If all checks pass, it
+executes without error and returns `None`.
+
+
 # ISC License
 
 Copyleft (c) 2022 k98kurz
