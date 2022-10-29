@@ -10,7 +10,7 @@ details.
 - [x] Interface
 - [x] Basic Tests
 - [x] Basic Implementation
-- [ ] Proofs
+- [x] Proofs
 
 # Installation
 

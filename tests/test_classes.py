@@ -1,5 +1,6 @@
-from hashlib import sha256
 from context import classes, interfaces
+from hashlib import sha256
+from random import randint
 import unittest
 
 
@@ -45,8 +46,8 @@ class TestMerkle(unittest.TestCase):
     def test_Tree_from_leaves_joins_any_number_of_leaves(self):
         roots = set()
 
-        for i in range(2, 1000):
-            leaves = [i.to_bytes(2, 'big') for _ in range(i)]
+        for i in range(2, 300):
+            leaves = [n.to_bytes(2, 'big') for n in range(i)]
             tree = classes.Tree.from_leaves(leaves)
             assert tree.root not in roots
             roots.add(tree.root)
@@ -78,6 +79,85 @@ class TestMerkle(unittest.TestCase):
         deserialized = classes.Tree.from_json(serialized)
         assert type(deserialized) is classes.Tree
         assert tree == deserialized
+
+    def test_Tree_prove_produces_list_of_bytes_proof(self):
+        for i in range(2, 300):
+            leaves = [n.to_bytes(2, 'big') for n in range(i)]
+            tree = classes.Tree.from_leaves(leaves)
+            proof = tree.prove(randint(0, i-1).to_bytes(2, 'big'))
+            assert type(proof) is list
+            for step in proof:
+                assert type(step) is bytes
+
+    def test_Tree_prove_raises_errors_for_invalid_params(self):
+        leaves = [n.to_bytes(2, 'big') for n in range(13)]
+        tree = classes.Tree.from_leaves(leaves)
+        leaf = leaves[3]
+
+        with self.assertRaises(AssertionError) as e:
+            tree.prove('not bytes')
+        assert str(e.exception) == 'leaf must be bytes'
+
+        with self.assertRaises(AssertionError) as e:
+            tree.prove(b'not in tree')
+        assert str(e.exception) == 'the given leaf was not found in the tree'
+
+    def test_Tree_verify_executes_without_error_for_valid_proof(self):
+        for i in range(2, 300):
+            leaves = [n.to_bytes(2, 'big') for n in range(i)]
+            tree = classes.Tree.from_leaves(leaves)
+            leaf = randint(0, i-1).to_bytes(2, 'big')
+            proof = tree.prove(leaf)
+            classes.Tree.verify(tree.root, leaf, proof)
+
+    def test_Tree_verify_raises_errors_for_invalid_params(self):
+        leaves = [n.to_bytes(2, 'big') for n in range(13)]
+        tree = classes.Tree.from_leaves(leaves)
+        leaf = leaves[3]
+        proof = tree.prove(leaf)
+
+        with self.assertRaises(AssertionError) as e:
+            classes.Tree.verify('tree.root', leaf, proof)
+        assert str(e.exception) == 'root must be 32 bytes'
+
+        with self.assertRaises(AssertionError) as e:
+            classes.Tree.verify(tree.root, 'leaf', proof)
+        assert str(e.exception) == 'leaf must be bytes'
+
+        with self.assertRaises(AssertionError) as e:
+            classes.Tree.verify(tree.root, leaf, {'not': 'list'})
+        assert str(e.exception) == 'proof must be list of bytes'
+
+        with self.assertRaises(AssertionError) as e:
+            wrong_proof = ['not bytes']
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == 'proof must be list of bytes'
+
+    def test_Tree_verify_raises_errors_for_invalid_proofs(self):
+        leaves = [n.to_bytes(2, 'big') for n in range(13)]
+        tree = classes.Tree.from_leaves(leaves)
+        leaf = leaves[3]
+        proof = tree.prove(leaf)
+
+        with self.assertRaises(AssertionError) as e:
+            classes.Tree.verify(tree.root, leaf + b'1', proof)
+        assert str(e.exception) == 'proof does not reference leaf'
+
+        with self.assertRaises(AssertionError) as e:
+            wrong_proof = proof[1:]
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == 'proof does not reference leaf'
+
+        with self.assertRaises(AssertionError) as e:
+            wrong_proof = proof[:-1]
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == 'proof missing final_hash op'
+
+        with self.assertRaises(AssertionError) as e:
+            wrong_proof = [*proof]
+            wrong_proof[-1] = wrong_proof[-1] + b'1'
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == 'proof does not reference root'
 
 
 if __name__ == '__main__':
