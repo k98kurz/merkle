@@ -29,8 +29,8 @@ class Tree:
         if type(self.right) is Tree:
             self.right.parent = self
 
-        self.left_bytes = left.root if isinstance(left, Tree) else left
-        self.right_bytes = right.root if isinstance(right, Tree) else right
+        self.left_bytes = self.left.root if isinstance(self.left, Tree) else self.left
+        self.right_bytes = self.right.root if isinstance(self.right, Tree) else self.right
         self.root = sha256(self.left_bytes + self.right_bytes).digest()
 
     def __str__(self) -> str:
