@@ -1,19 +1,19 @@
 from __future__ import annotations
 from hashlib import sha256
 from merkle.interfaces import ProofOp
-from typing import Any, Optional
+from typing import Optional
 import json
 
 
 class Tree:
     root: bytes
-    left: Any[Tree | bytes]
-    right: Any[Tree | bytes]
+    left: Tree | bytes
+    right: Tree | bytes
     parent: Optional[Tree]
     left_bytes: bytes
     right_bytes: bytes
 
-    def __init__(self, left: Any[Tree | bytes], right: Any[Tree | bytes]) -> None:
+    def __init__(self, left: Tree | bytes, right: Tree | bytes) -> None:
         """Set the left, right, and calculated root."""
         assert type(left) in (Tree, bytes, bytearray), \
             'left must be one of Tree, bytes, bytearray'
@@ -124,11 +124,11 @@ class Tree:
         def traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list:
             """Returns form [(hash, parent, history),...]."""
             nodes = []
-            root = (branch.root, None, tuple(history))
+            if not exclude_root:
+                root = (branch.root, None, tuple(history))
+                nodes += [root]
             left = (branch.left_bytes, branch, (*history, -1))
             right = (branch.right_bytes, branch, (*history, 1))
-            if not exclude_root:
-                nodes.append(root)
             nodes += [left, right]
 
             if type(branch.left) is Tree:
