@@ -44,6 +44,8 @@ leaves = [b'leaf1', b'leaf2', b'leaf3', b'leaf4', b'etc']
 tree = Tree.from_leaves(leaves)
 ```
 
+Note that all leaves are hashed by the `from_leaves` method.
+
 ## __init__
 
 To make custom Merklized data structures, use the `__init__` method:
@@ -55,8 +57,16 @@ from merkle import Tree
 leaf1 = sha256(b'leaf1').digest()
 leaf2 = sha256(b'leaf2').digest()
 leaf3 = sha256(b'leaf3').digest()
+leaf4 = sha256(b'leaf4').digest()
+leaf5 = sha256(b'leaf5').digest()
 
-tree = Tree(leaf1, Tree(leaf2, leaf3))
+tree = Tree(
+    leaf1,
+    Tree(
+        Tree(leaf2, leaf3),
+        Tree(leaf4, leaf5)
+    )
+)
 ```
 
 ## to_dict and from_dict
@@ -80,7 +90,9 @@ from merkle import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 serialized = tree.to_json()
+pretty = tree.to_json(pretty=True)
 deserialized = Tree.from_json(serialized)
+assert deserialized == Tree.from_json(pretty)
 ```
 
 ## prove
@@ -95,7 +107,15 @@ proof = tree.prove(b'leaf2')
 ```
 
 Each inclusion proof is a list of bytes, where the first byte in each item in
-the list is one of the codes from `interfaces.ProofOp`.
+the list is one of the codes from `interfaces.ProofOp`. An optional parameter,
+`verbose`, can be set to `True` in the call to `prove` if the proof should
+include checks for intermediate values; if `verbose` is left to the default
+`False` value, a shorter proof that checks only the final hash will be produced.
+There are no security advantages to using verbose proofs; it is primarily useful
+for manual inspection by including intermediate, calculated values. However, the
+functionality exists as a side-effect of preventing malicious proofs from
+tricking the validator -- `test_Tree_verify_does_not_validate_malicious_proof`
+contains an example attack.
 
 ## verify
 
@@ -106,13 +126,34 @@ from merkle import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 leaf = b'leaf1'
-proof = tree.prove(b'leaf2')
+proof1 = tree.prove(leaf)
+proof2 = tree.prove(b'leaf2')
 
 try:
-    Tree.verify(tree.root, leaf, proof)
+    Tree.verify(tree.root, leaf, proof1)
+    # expected result
+    print(f'verified proof {[p.hex() for p in proof1]} for {leaf=}')
 except ValueError as e:
     print('invalid proof supplied')
 except AssertionError as e:
+    print(f'error encountered: {e}')
+
+try:
+    Tree.verify(tree.root, leaf, [b'\x99', *proof2])
+    print(f'verified proof {[p.hex() for p in proof2]} for {leaf=}')
+except ValueError as e:
+    # expected result
+    print('invalid proof supplied')
+except AssertionError as e:
+    print(f'error encountered: {e}')
+
+try:
+    Tree.verify(tree.root, leaf, proof2)
+    print(f'verified proof {[p.hex() for p in proof2]} for {leaf=}')
+except ValueError as e:
+    print('invalid proof supplied')
+except AssertionError as e:
+    # expected result
     print(f'error encountered: {e}')
 ```
 
@@ -127,7 +168,7 @@ executes without error and returns `None`.
 
 # ISC License
 
-Copyleft (c) 2022 k98kurz
+Copyleft (c) 2023 k98kurz
 
 Permission to use, copy, modify, and/or distribute this software
 for any purpose with or without fee is hereby granted, provided
