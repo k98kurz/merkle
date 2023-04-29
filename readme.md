@@ -68,7 +68,7 @@ from merkle import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 converted = tree.to_dict()
-deconverted = Tree.from_json(converted)
+deconverted = Tree.from_dict(converted)
 ```
 
 ## to_json and from_json
