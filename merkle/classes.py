@@ -1,6 +1,6 @@
 from __future__ import annotations
 from hashlib import sha256
-from merkle.interfaces import ProofOp
+from .interfaces import ProofOp
 from typing import Optional
 import json
 
