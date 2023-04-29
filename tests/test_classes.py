@@ -85,14 +85,17 @@ class TestMerkle(unittest.TestCase):
             leaves = [n.to_bytes(2, 'big') for n in range(i)]
             tree = classes.Tree.from_leaves(leaves)
             proof = tree.prove(randint(0, i-1).to_bytes(2, 'big'))
+            proof_verbose = tree.prove(randint(0, i-1).to_bytes(2, 'big'), verbose=True)
             assert type(proof) is list
+            assert type(proof_verbose) is list
             for step in proof:
+                assert type(step) is bytes
+            for step in proof_verbose:
                 assert type(step) is bytes
 
     def test_Tree_prove_raises_errors_for_invalid_params(self):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
         tree = classes.Tree.from_leaves(leaves)
-        leaf = leaves[3]
 
         with self.assertRaises(AssertionError) as e:
             tree.prove('not bytes')
@@ -101,6 +104,39 @@ class TestMerkle(unittest.TestCase):
         with self.assertRaises(AssertionError) as e:
             tree.prove(b'not in tree')
         assert str(e.exception) == 'the given leaf was not found in the tree'
+
+    def test_verbose_proof_is_longer_and_has_2_load_steps_after_hash(self):
+        leaves = [n.to_bytes(2, 'big') for n in range(17)]
+        tree = classes.Tree.from_leaves(leaves)
+        leaf_to_prove = randint(3, 15).to_bytes(2, 'big')
+        proof = tree.prove(leaf_to_prove)
+        verbose = tree.prove(leaf_to_prove, verbose=True)
+
+        assert len(verbose) > len(proof)
+
+        # normal proof
+        assert interfaces.ProofOp.load_left.value in (proof[0][:1], proof[1][:1])
+        assert interfaces.ProofOp.load_right.value in (proof[0][:1], proof[1][:1])
+        assert proof[2][:1] in (
+            interfaces.ProofOp.hash_left.value,
+            interfaces.ProofOp.hash_right.value
+        )
+        if proof[2][:1] == interfaces.ProofOp.hash_left.value:
+            assert proof[3][:1] != interfaces.ProofOp.load_left.value
+        else:
+            assert proof[3][:1] != interfaces.ProofOp.load_right.value
+
+        # verbose proof
+        assert interfaces.ProofOp.load_left.value in (verbose[0][:1], verbose[1][:1])
+        assert interfaces.ProofOp.load_right.value in (verbose[0][:1], verbose[1][:1])
+        assert verbose[2][:1] in (
+            interfaces.ProofOp.hash_left.value,
+            interfaces.ProofOp.hash_right.value
+        )
+        if verbose[2][:1] == interfaces.ProofOp.hash_left.value:
+            assert verbose[3][:1] == interfaces.ProofOp.load_left.value
+        else:
+            assert verbose[3][:1] == interfaces.ProofOp.load_right.value
 
     def test_Tree_verify_executes_without_error_for_valid_proof(self):
         for i in range(2, 300):
@@ -176,8 +212,10 @@ class TestMerkle(unittest.TestCase):
                 tree = classes.Tree(leaves[i], tree)
 
         leaf = leaves[randint(0, len(leaves)-1)]
-        proof = tree.prove(leaf)
-        classes.Tree.verify(tree.root, leaf, proof)
+        proof1 = tree.prove(leaf)
+        proof2 = tree.prove(leaf, verbose=True)
+        classes.Tree.verify(tree.root, leaf, proof1)
+        classes.Tree.verify(tree.root, leaf, proof2)
 
 
 if __name__ == '__main__':

@@ -115,8 +115,10 @@ class Tree:
         """Deserialize from json and return an instance."""
         return cls.from_dict(json.loads(data))
 
-    def prove(self, leaf: bytes) -> list[bytes]:
-        """Create an inclusion proof for a leaf."""
+    def prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]:
+        """Create an inclusion proof for a leaf. Use verbose=True to add
+            hash checks at each tree level.
+        """
         assert type(leaf) is bytes, 'leaf must be bytes'
         leaf_hash = sha256(leaf).digest()
 
@@ -150,17 +152,22 @@ class Tree:
         # reverse the history
         history = list(node)[2][::-1]
         proof = []
+        first = True
 
         for direction in history:
             if direction == -1:
                 # left element
                 proof.append(ProofOp.hash_left.value)
-                proof.append(ProofOp.load_left.value + node[0])
+                if first or verbose:
+                    proof.append(ProofOp.load_left.value + node[0])
+                    first = False
                 proof.append(ProofOp.load_right.value + node[1].right_bytes)
             else:
                 # right element
                 proof.append(ProofOp.hash_right.value)
-                proof.append(ProofOp.load_right.value + node[0])
+                if first or verbose:
+                    proof.append(ProofOp.load_right.value + node[0])
+                    first = False
                 proof.append(ProofOp.load_left.value + node[1].left_bytes)
 
             # advance

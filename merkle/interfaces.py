@@ -41,8 +41,10 @@ class TreeProtocol(Protocol):
         """Deserialize from json and return an instance."""
         ...
 
-    def prove(self, leaf: bytes) -> dict:
-        """Create an inclusion proof for a leaf."""
+    def prove(self, leaf: bytes, verbose: bool = False) -> dict:
+        """Create an inclusion proof for a leaf. Use verbose=True to add
+            hash checks at each tree level.
+        """
         ...
 
     @staticmethod
