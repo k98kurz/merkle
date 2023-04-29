@@ -201,6 +201,27 @@ class TestMerkle(unittest.TestCase):
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
 
+    def test_Tree_verify_does_not_validate_malicious_proof(self):
+        leaves = [b'leaf0', b'leaf1', b'leaf2']
+        tree = classes.Tree.from_leaves(leaves)
+        legit_proof = tree.prove(b'leaf0')
+
+        # first instruction in legit_proof is a load_left operation
+        assert legit_proof[0][:1] == interfaces.ProofOp.load_left.value
+
+        # try to trick the validator by inserting malicious leaf then overwriting
+        # with the load_left instruction from the legit_proof, then continuing
+        # with the legit_proof
+        malicious_proof = [
+            interfaces.ProofOp.load_left.value + sha256(b'malicious leaf').digest(),
+            *legit_proof
+        ]
+
+        with self.assertRaises(AssertionError) as e:
+            # raises AssertionError to prevent proof hijacking
+            classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
+        assert str(e.exception) == 'generated hash does not match next step in proof'
+
     def test_e2e_arbitrary_branching(self):
         leaves = [sha256(n.to_bytes(2, 'big')).digest() for n in range(13)]
 
