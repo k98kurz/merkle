@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "merkleasy"
+version = "0.0.1"
+authors = [
+  { name="k98kurz", email="k98kurz@gmail.com" },
+]
+description = "Test package for a merkle tree library"
+readme = "readme.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: ISC License (ISCL)",
+    "Operating System :: OS Independent",
+    "Topic :: Security :: Cryptography"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/k98kurz/merkle"
+"Bug Tracker" = "https://github.com/k98kurz/merkle/issues"
