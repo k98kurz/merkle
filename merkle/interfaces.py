@@ -22,7 +22,7 @@ class TreeProtocol(Protocol):
         """Serialize to a dict."""
         ...
 
-    def to_json(self) -> str:
+    def to_json(self, pretty: bool = False) -> str:
         """Serialize to json."""
         ...
 

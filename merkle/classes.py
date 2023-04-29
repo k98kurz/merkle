@@ -59,9 +59,10 @@ class Tree:
             self.root.hex(): [left, right]
         }
 
-    def to_json(self) -> str:
+    def to_json(self, pretty: bool = False) -> str:
         """Serialize to json."""
-        return json.dumps(self.to_dict())
+        opts = {} if not pretty else {'indent': '\t'}
+        return json.dumps(self.to_dict(), **opts)
 
     @classmethod
     def from_leaves(cls, leaves: list[bytes]) -> Tree:
