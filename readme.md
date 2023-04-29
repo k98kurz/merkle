@@ -8,9 +8,11 @@ details.
 # Status
 
 - [x] Interface
-- [x] Basic Tests
-- [x] Basic Implementation
+- [x] Tests
+- [x] Implementation
 - [x] Proofs
+- [x] Usage Documentation
+- [ ] Publish to pypi
 
 # Installation
 
