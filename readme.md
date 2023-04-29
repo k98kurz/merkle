@@ -2,7 +2,7 @@
 
 This is a simple-to-use implementation of the concept of Merklized data
 structures, e.g. the Merkle Tree and the Merkle Mountain Range. There is a
-single class, `merkle.Tree`, with a simple interface. See the Usage section for
+single class, `merkleasy.Tree`, with a simple interface. See the Usage section for
 details. This uses sha256 as the hash algorithm.
 
 # Status
@@ -16,9 +16,13 @@ details. This uses sha256 as the hash algorithm.
 
 # Installation
 
-For now, clone the repo. There are no dependencies.
+```bash
+pip install merkleasy
+```
 
 # Testing
+
+To develop or test, fork or clone the repo. There are no dependencies.
 
 There is just one test file. Run it with the following:
 
@@ -40,7 +44,7 @@ Usage examples are shown below.
 The easiest way to use this to create a Merkle Tree is with `from_leaves`:
 
 ```py
-from merkle import Tree
+from merkleasy import Tree
 
 leaves = [b'leaf1', b'leaf2', b'leaf3', b'leaf4', b'etc']
 tree = Tree.from_leaves(leaves)
@@ -54,7 +58,7 @@ To make custom Merklized data structures, use the `__init__` method:
 
 ```py
 from hashlib import sha256
-from merkle import Tree
+from merkleasy import Tree
 
 leaf1 = sha256(b'leaf1').digest()
 leaf2 = sha256(b'leaf2').digest()
@@ -76,7 +80,7 @@ tree = Tree(
 A Tree structure can be converted to a dict and back.
 
 ```py
-from merkle import Tree
+from merkleasy import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 converted = tree.to_dict()
@@ -88,7 +92,7 @@ deconverted = Tree.from_dict(converted)
 Serialization and deserialization of a structure uses `to_json` and `from_json`:
 
 ```py
-from merkle import Tree
+from merkleasy import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 serialized = tree.to_json()
@@ -102,7 +106,7 @@ assert deserialized == Tree.from_json(pretty)
 Inclusion proofs can be generated using the `prove` method:
 
 ```py
-from merkle import Tree
+from merkleasy import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 proof = tree.prove(b'leaf2')
@@ -124,7 +128,7 @@ contains an example attack.
 Inclusion proofs can be verified using `Tree.verify`:
 
 ```py
-from merkle import Tree
+from merkleasy import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 leaf = b'leaf1'
