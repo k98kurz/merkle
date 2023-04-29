@@ -12,7 +12,7 @@ details. This uses sha256 as the hash algorithm.
 - [x] Implementation
 - [x] Proofs
 - [x] Usage Documentation
-- [ ] Publish to pypi
+- [x] Publish to pypi
 
 # Installation
 
