@@ -172,6 +172,20 @@ it will throw an `AssertionError` or `ValueError`. If all checks pass, it
 executes without error and returns `None`.
 
 
+# Security / Usage Note
+
+Any application/library that uses this package should use a schema for leaves
+that is anything except exactly 32 bytes. This prevents the second-preimage
+attack whereby the application is tricked into thinking that an intermediate
+node in the tree is a leaf. It is hard to envision a scenario in which this
+could actually become a serious security issue, but it is worth keeping in mind
+during application development.
+
+So in addition to verifying an inclusion proof, verify that the data fits the
+leaf schema. Preferably, leaf schema should not be bytes, and a serializer to
+bytes from the schema should be used on the leaf before verifying the inclusion
+proof.
+
 # ISC License
 
 Copyleft (c) 2023 k98kurz
