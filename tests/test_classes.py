@@ -201,6 +201,11 @@ class TestMerkle(unittest.TestCase):
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
 
+        with self.assertRaises(AssertionError) as e:
+            wrong_proof = proof[:-1]
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == 'proof missing final_hash op'
+
     def test_Tree_verify_does_not_validate_malicious_proof(self):
         leaves = [b'leaf0', b'leaf1', b'leaf2']
         tree = classes.Tree.from_leaves(leaves)
@@ -221,6 +226,13 @@ class TestMerkle(unittest.TestCase):
             # raises AssertionError to prevent proof hijacking
             classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
         assert str(e.exception) == 'generated hash does not match next step in proof'
+
+        # try to trick the validator by using a proof for a different tree
+        malicious_proof = classes.Tree.from_leaves([b'malicious', b'leaves']).prove(b'malicious')
+
+        with self.assertRaises(AssertionError) as e:
+            classes.Tree.verify(tree.root, b'malicious', malicious_proof)
+        assert str(e.exception) == 'proof does not reference root'
 
     def test_e2e_arbitrary_branching(self):
         leaves = [sha256(n.to_bytes(2, 'big')).digest() for n in range(13)]
