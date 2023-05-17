@@ -2,8 +2,9 @@
 
 This is a simple-to-use implementation of the concept of Merklized data
 structures, e.g. the Merkle Tree and the Merkle Mountain Range. There is a
-single class, `merkleasy.Tree`, with a simple interface. See the Usage section for
-details. This uses sha256 as the default hash algorithm.
+single main class, `merkleasy.Tree`, three error classes, and two utility
+functions. See the Usage section for details. This uses sha256 as the default
+hash algorithm, but it can use any in theory.
 
 # Status
 
