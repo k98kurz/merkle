@@ -39,6 +39,19 @@ questions about the code can likely be answered by reading through them.
 
 Usage examples are shown below.
 
+## set_hash_function
+
+The package uses sha256 by default, but it can be used with any hash function.
+This is accomplished by passing a callable that takes a bytes parameter, applies
+a hash algorithm, and returns a bytes value. For example, to use sha3_256:
+
+```python
+from hashlib import sha3_256
+from merkleasy import set_hash_function
+
+set_hash_function(lambda preimage: sha3_256(preimage).digest())
+```
+
 ## from_leaves
 
 The easiest way to use this to create a Merkle Tree is with `from_leaves`:
