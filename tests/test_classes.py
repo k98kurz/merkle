@@ -59,7 +59,7 @@ class TestMerkle(unittest.TestCase):
         serialized = tree.to_dict()
         assert type(serialized) is dict
 
-    def test_Tree_from_dict_unserializes_and_returns_instance(self):
+    def test_Tree_from_dict_deserializes_and_returns_instance(self):
         tree = classes.Tree(b'left', b'right')
         serialized = tree.to_dict()
         assert hasattr(classes.Tree, 'from_dict')
@@ -226,6 +226,12 @@ class TestMerkle(unittest.TestCase):
             wrong_proof[1] = b'\x99' + wrong_proof[1]
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
+
+        with self.assertRaises(errors.SecurityError) as e:
+            wrong_proof = [*proof]
+            wrong_proof[1] = wrong_proof[1] + b'\x99'
+            classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert str(e.exception) == "final hash does not match"
 
     def test_Tree_verify_does_not_validate_malicious_proof(self):
         leaves = [b'leaf0', b'leaf1', b'leaf2']
