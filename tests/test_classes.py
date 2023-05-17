@@ -1,24 +1,26 @@
 from context import classes, errors
-from hashlib import sha256
+from hashlib import sha256, sha3_256
 from random import randint
 import unittest
 
 
 class TestMerkle(unittest.TestCase):
     """Test suite for the Merkle project."""
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        classes.set_hash_function(lambda preimage: sha256(preimage).digest())
+    def setUp(self) -> None:
+        self.original_hash_function = classes.get_hash_function()
+
+    def tearDown(self) -> None:
+        classes.set_hash_function(self.original_hash_function)
 
     def test_merkle_has_class_Tree(self):
         assert hasattr(classes, 'Tree')
         assert isinstance(classes.Tree, type)
 
     def test_Tree_joins_left_and_right_into_root(self):
-        left = sha256(b'hello').digest()
-        right = sha256(b'world').digest()
-        joined = sha256(left + right).digest()
+        classes.set_hash_function(lambda data: sha3_256(data).digest())
+        left = sha3_256(b'hello').digest()
+        right = sha3_256(b'world').digest()
+        joined = sha3_256(left + right).digest()
         tree = classes.Tree(left, right)
 
         assert hasattr(tree, 'root')

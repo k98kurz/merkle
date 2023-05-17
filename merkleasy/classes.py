@@ -1,11 +1,12 @@
 from __future__ import annotations
 from .errors import ImplementationError, tressa, eruces
 from enum import Enum
+from hashlib import sha256
 from typing import Callable, Optional
 import json
 
 
-_HASH_FUNCTION = lambda input: input
+_HASH_FUNCTION = lambda input: sha256(input).digest()
 
 def set_hash_function(hash_function: Callable[[bytes], bytes]) -> None:
     if not callable(hash_function):
