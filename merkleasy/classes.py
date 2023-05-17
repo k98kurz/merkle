@@ -1,7 +1,6 @@
 from __future__ import annotations
 from .errors import ImplementationError, tressa, eruces
 from enum import Enum
-from hashlib import sha256
 from typing import Callable, Optional
 import json
 
@@ -58,7 +57,7 @@ class Tree:
 
         self.left_bytes = self.left.root if isinstance(self.left, Tree) else self.left
         self.right_bytes = self.right.root if isinstance(self.right, Tree) else self.right
-        self.root = sha256(self.left_bytes + self.right_bytes).digest()
+        self.root = get_hash_function()(self.left_bytes + self.right_bytes)
 
     def __str__(self) -> str:
         """Return the root, left, and right in hexadecimal."""
@@ -101,7 +100,7 @@ class Tree:
             tressa(isinstance(leaf, bytes), 'leaves must be tuple or list of bytes')
 
         # hash all leaves
-        parts = [sha256(leaf).digest() for leaf in leaves]
+        parts = [get_hash_function()(leaf) for leaf in leaves]
 
         def join(parts) -> list[Tree]:
             new_parts = []
@@ -145,7 +144,7 @@ class Tree:
             hash checks at each tree level.
         """
         tressa(type(leaf) is bytes, 'leaf must be bytes')
-        leaf_hash = sha256(leaf).digest()
+        leaf_hash = get_hash_function()(leaf)
 
         # get set of nodes
         def traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list:
@@ -215,7 +214,7 @@ class Tree:
         tressa(type(proof) is list, 'proof must be list of bytes')
 
         # parsing proof
-        leaf_hash = sha256(leaf).digest()
+        leaf_hash = get_hash_function()(leaf)
         steps = []
         for step in proof:
             # another precondition
@@ -252,11 +251,11 @@ def _run_verification_step(step: tuple[ProofOp, Optional[bytes]], data: dict) ->
                     'generated hash does not match next step in proof')
             data['right'] = step[1]
         case ProofOp.hash_left:
-            data['left'] = sha256(data['left'] + data['right']).digest()
+            data['left'] = get_hash_function()(data['left'] + data['right'])
             data['right'] = None
         case ProofOp.hash_right:
-            data['right'] = sha256(data['left'] + data['right']).digest()
+            data['right'] = get_hash_function()(data['left'] + data['right'])
             data['left'] = None
         case ProofOp.hash_final:
-            result = sha256(data['left'] + data['right']).digest()
+            result = get_hash_function()(data['left'] + data['right'])
             eruces(result == step[1], 'final hash does not match')

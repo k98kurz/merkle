@@ -6,6 +6,11 @@ import unittest
 
 class TestMerkle(unittest.TestCase):
     """Test suite for the Merkle project."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        classes.set_hash_function(lambda preimage: sha256(preimage).digest())
+
     def test_merkle_has_class_Tree(self):
         assert hasattr(classes, 'Tree')
         assert isinstance(classes.Tree, type)
