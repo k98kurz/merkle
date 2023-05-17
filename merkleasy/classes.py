@@ -1,34 +1,9 @@
 from __future__ import annotations
+from .errors import ImplementationError, tressa, eruces
 from enum import Enum
 from hashlib import sha256
 from typing import Callable, Optional
 import json
-
-
-class ImplementationError(BaseException):
-    ...
-
-class UsagePreconditionError(BaseException):
-    ...
-
-class SecurityError(BaseException):
-    ...
-
-
-def tressa(condition: bool, error_message: str) -> None:
-    """Raises a UsagePreconditionError with the given error_message.
-        Replacement for assert statements and AssertionError.
-    """
-    if not condition:
-        raise UsagePreconditionError(error_message)
-
-def eruces(condition: bool, error_message: str) -> None:
-    """Raises a SecurityError with the given error_message.
-        Replacement for assert statements and AssertionError during proof
-        verification.
-    """
-    if not condition:
-        raise SecurityError(error_message)
 
 
 _HASH_FUNCTION = lambda input: input
