@@ -176,24 +176,7 @@ class Tree:
         leaf_hash = get_hash_function()(leaf)
 
         # get set of nodes
-        def traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list:
-            """Returns form [(hash, parent, history),...]."""
-            nodes = []
-            if not exclude_root:
-                root = (branch.root, None, tuple(history))
-                nodes += [root]
-            left = (branch.left_bytes, branch, (*history, -1))
-            right = (branch.right_bytes, branch, (*history, 1))
-            nodes += [left, right]
-
-            if type(branch.left) is Tree:
-                nodes.extend(traverse(branch.left, (*history, -1)))
-            if type(branch.right) is Tree:
-                nodes.extend(traverse(branch.right, (*history, 1)))
-
-            return nodes
-
-        nodes = set(traverse(self, tuple(), False))
+        nodes = set(_traverse(self, tuple(), False))
         node_hashes = [n[0] for n in nodes]
 
         tressa(leaf in node_hashes or leaf_hash in node_hashes,
@@ -263,6 +246,23 @@ class Tree:
         for step in steps:
             _run_verification_step(step, data)
 
+
+def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list:
+    """Returns form [(hash, parent, history),...]."""
+    nodes = []
+    if not exclude_root:
+        root = (branch.root, None, tuple(history))
+        nodes += [root]
+    left = (branch.left_bytes, branch, (*history, -1))
+    right = (branch.right_bytes, branch, (*history, 1))
+    nodes += [left, right]
+
+    if type(branch.left) is Tree:
+        nodes.extend(_traverse(branch.left, (*history, -1)))
+    if type(branch.right) is Tree:
+        nodes.extend(_traverse(branch.right, (*history, 1)))
+
+    return nodes
 
 def _run_verification_step(step: tuple[ProofOp, Optional[bytes]], data: dict) -> None:
     """Runs an individual verification step. Raises SecurityError on
