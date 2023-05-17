@@ -1,4 +1,4 @@
-from context import classes, interfaces
+from context import classes
 from hashlib import sha256
 from random import randint
 import unittest
@@ -6,15 +6,9 @@ import unittest
 
 class TestMerkle(unittest.TestCase):
     """Test suite for the Merkle project."""
-    def test_merkle_has_TreeProtocol_interface(self):
-        assert hasattr(interfaces, 'TreeProtocol')
-
     def test_merkle_has_class_Tree(self):
         assert hasattr(classes, 'Tree')
         assert isinstance(classes.Tree, type)
-
-    def test_Tree_implements_TreeProtocol(self):
-        assert issubclass(classes.Tree, interfaces.TreeProtocol)
 
     def test_Tree_joins_left_and_right_into_root(self):
         left = sha256(b'hello').digest()
@@ -115,28 +109,28 @@ class TestMerkle(unittest.TestCase):
         assert len(verbose) > len(proof)
 
         # normal proof
-        assert interfaces.ProofOp.load_left.value in (proof[0][:1], proof[1][:1])
-        assert interfaces.ProofOp.load_right.value in (proof[0][:1], proof[1][:1])
+        assert classes.ProofOp.load_left.value in (proof[0][:1], proof[1][:1])
+        assert classes.ProofOp.load_right.value in (proof[0][:1], proof[1][:1])
         assert proof[2][:1] in (
-            interfaces.ProofOp.hash_left.value,
-            interfaces.ProofOp.hash_right.value
+            classes.ProofOp.hash_left.value,
+            classes.ProofOp.hash_right.value
         )
-        if proof[2][:1] == interfaces.ProofOp.hash_left.value:
-            assert proof[3][:1] != interfaces.ProofOp.load_left.value
+        if proof[2][:1] == classes.ProofOp.hash_left.value:
+            assert proof[3][:1] != classes.ProofOp.load_left.value
         else:
-            assert proof[3][:1] != interfaces.ProofOp.load_right.value
+            assert proof[3][:1] != classes.ProofOp.load_right.value
 
         # verbose proof
-        assert interfaces.ProofOp.load_left.value in (verbose[0][:1], verbose[1][:1])
-        assert interfaces.ProofOp.load_right.value in (verbose[0][:1], verbose[1][:1])
+        assert classes.ProofOp.load_left.value in (verbose[0][:1], verbose[1][:1])
+        assert classes.ProofOp.load_right.value in (verbose[0][:1], verbose[1][:1])
         assert verbose[2][:1] in (
-            interfaces.ProofOp.hash_left.value,
-            interfaces.ProofOp.hash_right.value
+            classes.ProofOp.hash_left.value,
+            classes.ProofOp.hash_right.value
         )
-        if verbose[2][:1] == interfaces.ProofOp.hash_left.value:
-            assert verbose[3][:1] == interfaces.ProofOp.load_left.value
+        if verbose[2][:1] == classes.ProofOp.hash_left.value:
+            assert verbose[3][:1] == classes.ProofOp.load_left.value
         else:
-            assert verbose[3][:1] == interfaces.ProofOp.load_right.value
+            assert verbose[3][:1] == classes.ProofOp.load_right.value
 
     def test_Tree_verify_executes_without_error_for_valid_proof(self):
         for i in range(2, 300):
@@ -212,13 +206,13 @@ class TestMerkle(unittest.TestCase):
         legit_proof = tree.prove(b'leaf0')
 
         # first instruction in legit_proof is a load_left operation
-        assert legit_proof[0][:1] == interfaces.ProofOp.load_left.value
+        assert legit_proof[0][:1] == classes.ProofOp.load_left.value
 
         # try to trick the validator by inserting malicious leaf then overwriting
         # with the load_left instruction from the legit_proof, then continuing
         # with the legit_proof
         malicious_proof = [
-            interfaces.ProofOp.load_left.value + sha256(b'malicious leaf').digest(),
+            classes.ProofOp.load_left.value + sha256(b'malicious leaf').digest(),
             *legit_proof
         ]
 

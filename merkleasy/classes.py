@@ -1,8 +1,45 @@
 from __future__ import annotations
+from enum import Enum
 from hashlib import sha256
-from .interfaces import ProofOp
-from typing import Optional
+from typing import Callable, Optional
 import json
+
+
+class ImplementationError(BaseException):
+    ...
+
+
+def tressa(condition: bool, error_message: str) -> None:
+    """Raises an ImplementationError with the given error_message.
+        Replacement for assert statements and AssertionError.
+    """
+    if condition:
+        return
+    raise ImplementationError(error_message)
+
+
+_HASH_FUNCTION = lambda input: input
+
+def set_hash_function(hash_function: Callable[[bytes], bytes]) -> None:
+    tressa(callable(hash_function), 'hash_function must be callable')
+    try:
+        output = hash_function(b'test')
+        tressa(type(output) is bytes, 'hash_function must return bytes when called')
+        global _HASH_FUNCTION
+        _HASH_FUNCTION = hash_function
+    except BaseException as e:
+        tressa(False, 'hash_function execution failed')
+
+def get_hash_function() -> Callable[[bytes], bytes]:
+    return _HASH_FUNCTION
+
+
+class ProofOp(Enum):
+    load_left = b'\x00'
+    load_right = b'\x01'
+    hash_left = b'\x02'
+    hash_right = b'\x03'
+    hash_final = b'\x04'
 
 
 class Tree:
