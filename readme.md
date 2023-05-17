@@ -7,7 +7,6 @@ details. This uses sha256 as the hash algorithm.
 
 # Status
 
-- [x] Interface
 - [x] Tests
 - [x] Implementation
 - [x] Proofs
@@ -52,7 +51,48 @@ from merkleasy import set_hash_function
 set_hash_function(lambda preimage: sha3_256(preimage).digest())
 ```
 
-## from_leaves
+Note that calling `set_hash_function` will have no effect on any `Tree`s created
+prior. If you plan to use the library with a non-default hash function, then
+`set_hash_function` should be called during a setup routine.
+
+If you want to handle multiple `Tree`s created with different hash algorithms,
+then a context handler like the below might be useful:
+
+```python
+from hashlib import sha3_256
+from merkleasy import set_hash_function, get_hash_function, Tree
+
+
+class HashAlgoSwitch:
+    """Context manager for switching out algorithms for Tree use."""
+    def __init__(self, new_hash_function) -> None:
+        self.original_hash_function = get_hash_function()
+        set_hash_function(new_hash_function)
+    def __enter__(self) -> None:
+        return
+    def __exit__(self, __exc_type, __exc_value, __traceback) -> None:
+        set_hash_function(self.original_hash_function)
+
+
+leaves = [b'one', b'two', b'three']
+tree1 = Tree.from_leaves(leaves)
+
+with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
+    tree2 = Tree.from_leaves(leaves)
+    assert tree1 != tree2
+```
+
+## get_hash_function
+
+To access the currently-set hash function, use the following:
+
+```python
+from merkleasy import get_hash_function
+
+hash_function = get_hash_function()
+```
+
+## Tree.from_leaves
 
 The easiest way to use this to create a Merkle Tree is with `from_leaves`:
 
@@ -65,7 +105,7 @@ tree = Tree.from_leaves(leaves)
 
 Note that all leaves are hashed by the `from_leaves` method.
 
-## __init__
+## Tree.__init__
 
 To make custom Merklized data structures, use the `__init__` method:
 
@@ -78,17 +118,21 @@ leaf2 = sha256(b'leaf2').digest()
 leaf3 = sha256(b'leaf3').digest()
 leaf4 = sha256(b'leaf4').digest()
 leaf5 = sha256(b'leaf5').digest()
+another_whole_tree = Tree.from_leaves([b'123', b'456', b'789'])
 
 tree = Tree(
-    leaf1,
     Tree(
-        Tree(leaf2, leaf3),
-        Tree(leaf4, leaf5)
-    )
+        leaf1,
+        Tree(
+            Tree(leaf2, leaf3),
+            Tree(leaf4, leaf5)
+        )
+    ),
+    another_whole_tree
 )
 ```
 
-## to_dict and from_dict
+## Tree.to_dict and Tree.from_dict
 
 A Tree structure can be converted to a dict and back.
 
@@ -100,7 +144,7 @@ converted = tree.to_dict()
 deconverted = Tree.from_dict(converted)
 ```
 
-## to_json and from_json
+## Tree.to_json and Tree.from_json
 
 Serialization and deserialization of a structure uses `to_json` and `from_json`:
 
@@ -114,7 +158,7 @@ deserialized = Tree.from_json(serialized)
 assert deserialized == Tree.from_json(pretty)
 ```
 
-## prove
+## Tree.prove
 
 Inclusion proofs can be generated using the `prove` method:
 
@@ -136,7 +180,7 @@ functionality exists as a side-effect of preventing malicious proofs from
 tricking the validator -- `test_Tree_verify_does_not_validate_malicious_proof`
 contains an example attack.
 
-## verify
+## Tree.verify
 
 Inclusion proofs can be verified using `Tree.verify`:
 
