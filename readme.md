@@ -174,10 +174,20 @@ If the call to `Tree.verify` is provided invalid parameters or an invalid proof,
 it will throw an `AssertionError` or `ValueError`. If all checks pass, it
 executes without error and returns `None`.
 
+## get_hash_function
+
+To access the currently-set hash function, use the following:
+
+```python
+from merkleasy import get_hash_function
+
+hash_function = get_hash_function()
+```
+
 ## set_hash_function
 
 The package uses sha256 by default, but it can be used with any hash function.
-This is accomplished by passing a callable that takes a bytes parameter, applies
+This is accomplished by passing a Callable that takes a bytes parameter, applies
 a hash algorithm, and returns a bytes value. For example, to use sha3_256:
 
 ```python
@@ -216,16 +226,6 @@ tree1 = Tree.from_leaves(leaves)
 with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
     tree2 = Tree.from_leaves(leaves)
     assert tree1 != tree2
-```
-
-## get_hash_function
-
-To access the currently-set hash function, use the following:
-
-```python
-from merkleasy import get_hash_function
-
-hash_function = get_hash_function()
 ```
 
 
