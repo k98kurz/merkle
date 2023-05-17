@@ -32,8 +32,8 @@ class TestMerkle(unittest.TestCase):
         assert tree.right == right_hash
         assert tree.root == root
 
-    def test_Tree_from_leaves_asserts_at_least_two_leaves(self):
-        with self.assertRaises(AssertionError) as e:
+    def test_Tree_from_leaves_tressas_at_least_two_leaves(self):
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             classes.Tree.from_leaves([b'123'])
         assert str(e.exception) == 'must have at least 2 leaves'
 
@@ -91,11 +91,11 @@ class TestMerkle(unittest.TestCase):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
         tree = classes.Tree.from_leaves(leaves)
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             tree.prove('not bytes')
         assert str(e.exception) == 'leaf must be bytes'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             tree.prove(b'not in tree')
         assert str(e.exception) == 'the given leaf was not found in the tree'
 
@@ -146,19 +146,19 @@ class TestMerkle(unittest.TestCase):
         leaf = leaves[3]
         proof = tree.prove(leaf)
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             classes.Tree.verify('tree.root', leaf, proof)
-        assert str(e.exception) == 'root must be 32 bytes'
+        assert str(e.exception) == 'root must be bytes'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             classes.Tree.verify(tree.root, 'leaf', proof)
         assert str(e.exception) == 'leaf must be bytes'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             classes.Tree.verify(tree.root, leaf, {'not': 'list'})
         assert str(e.exception) == 'proof must be list of bytes'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.UsagePreconditionError) as e:
             wrong_proof = ['not bytes']
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == 'proof must be list of bytes'
@@ -169,21 +169,21 @@ class TestMerkle(unittest.TestCase):
         leaf = leaves[3]
         proof = tree.prove(leaf)
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.SecurityError) as e:
             classes.Tree.verify(tree.root, leaf + b'1', proof)
         assert str(e.exception) == 'proof does not reference leaf'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.SecurityError) as e:
             wrong_proof = proof[1:]
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == 'proof does not reference leaf'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.SecurityError) as e:
             wrong_proof = proof[:-1]
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == 'proof missing final_hash op'
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.SecurityError) as e:
             wrong_proof = [*proof]
             wrong_proof[-1] = wrong_proof[-1] + b'1'
             classes.Tree.verify(tree.root, leaf, wrong_proof)
@@ -194,11 +194,6 @@ class TestMerkle(unittest.TestCase):
             wrong_proof[1] = b'\x99' + wrong_proof[1]
             classes.Tree.verify(tree.root, leaf, wrong_proof)
         assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
-
-        with self.assertRaises(AssertionError) as e:
-            wrong_proof = proof[:-1]
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof missing final_hash op'
 
     def test_Tree_verify_does_not_validate_malicious_proof(self):
         leaves = [b'leaf0', b'leaf1', b'leaf2']
@@ -216,15 +211,15 @@ class TestMerkle(unittest.TestCase):
             *legit_proof
         ]
 
-        with self.assertRaises(AssertionError) as e:
-            # raises AssertionError to prevent proof hijacking
+        with self.assertRaises(classes.SecurityError) as e:
+            # raises classes.SecurityError to prevent proof hijacking
             classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
         assert str(e.exception) == 'generated hash does not match next step in proof'
 
         # try to trick the validator by using a proof for a different tree
         malicious_proof = classes.Tree.from_leaves([b'malicious', b'leaves']).prove(b'malicious')
 
-        with self.assertRaises(AssertionError) as e:
+        with self.assertRaises(classes.SecurityError) as e:
             classes.Tree.verify(tree.root, b'malicious', malicious_proof)
         assert str(e.exception) == 'proof does not reference root'
 
