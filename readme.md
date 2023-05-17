@@ -198,8 +198,9 @@ set_hash_function(lambda preimage: sha3_256(preimage).digest())
 ```
 
 Note that calling `set_hash_function` will have no effect on any `Tree`s created
-prior. If you plan to use the library with a non-default hash function, then
-`set_hash_function` should be called during a setup routine.
+prior. However, it _will_ affect any calls to `prove` or `verify`. If you plan
+to use the library with a non-default hash function, then `set_hash_function`
+should be called during a setup routine.
 
 If you want to handle multiple `Tree`s created with different hash algorithms,
 then a context handler like the below might be useful:
@@ -220,12 +221,15 @@ class HashAlgoSwitch:
         set_hash_function(self.original_hash_function)
 
 
+def alt_create_tree(leaves) -> Tree:
+    with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
+        return Tree.from_leaves(leaves)
+
+
 leaves = [b'one', b'two', b'three']
 tree1 = Tree.from_leaves(leaves)
-
-with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
-    tree2 = Tree.from_leaves(leaves)
-    assert tree1 != tree2
+tree2 = alt_create_tree(leaves)
+assert tree1 != tree2
 ```
 
 
