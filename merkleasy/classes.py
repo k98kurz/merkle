@@ -144,13 +144,15 @@ class Tree:
         tressa(type(data) is dict, 'data must be dict type')
         tressa(len(data.keys()) == 1, 'data must have one key')
         root = list(data.keys())[0]
-        tressa(len(data[root]) == 2, 'data must have left and right branch')
+        tressa(len(data[root]) == 2, 'data[root] must have left and right branch')
         left = data[root][0]
         right = data[root][1]
 
         left = bytes.fromhex(left) if type(left) is str else cls.from_dict(left)
         right = bytes.fromhex(right) if type(right) is str else cls.from_dict(right)
-        return cls(left, right)
+        tree = cls(left, right)
+        eruces(tree.root.hex() == root, 'root mismatch')
+        return tree
 
     @classmethod
     def from_json(cls, data: str) -> Tree:

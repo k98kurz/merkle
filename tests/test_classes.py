@@ -67,6 +67,31 @@ class TestMerkle(unittest.TestCase):
         assert type(deserialized) is classes.Tree
         assert tree == deserialized
 
+    def test_Tree_from_dict_raises_errors_for_invalid_params(self):
+        tree = classes.Tree(b'left', b'right')
+        serialized = tree.to_dict()
+
+        with self.assertRaises(errors.UsagePreconditionError) as e:
+            classes.Tree.from_dict('not a dict')
+        assert str(e.exception) == 'data must be dict type'
+
+        with self.assertRaises(errors.UsagePreconditionError) as e:
+            classes.Tree.from_dict({})
+        assert str(e.exception) == 'data must have one key'
+
+        with self.assertRaises(errors.UsagePreconditionError) as e:
+            classes.Tree.from_dict({**serialized, 'what': 'huh'})
+        assert str(e.exception) == 'data must have one key'
+
+        with self.assertRaises(errors.UsagePreconditionError) as e:
+            classes.Tree.from_dict({"3213": [1,2,3]})
+        assert str(e.exception) == 'data[root] must have left and right branch'
+
+        with self.assertRaises(errors.SecurityError) as e:
+            key = list(serialized.keys())[0]
+            classes.Tree.from_dict({"2323": serialized[key]})
+        assert str(e.exception) == 'root mismatch'
+
     def test_Tree_instance_serializes_to_json(self):
         tree = classes.Tree(b'left', b'right')
         assert hasattr(tree, 'to_json') and callable(tree.to_json)
