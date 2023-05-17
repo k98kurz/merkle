@@ -198,9 +198,10 @@ set_hash_function(lambda preimage: sha3_256(preimage).digest())
 ```
 
 Note that calling `set_hash_function` will have no effect on any `Tree`s created
-prior. However, it _will_ affect any calls to `prove` or `verify`. If you plan
-to use the library with a non-default hash function, then `set_hash_function`
-should be called during a setup routine.
+prior. However, it _will_ affect any calls to `prove` on those `Tree`s or any
+calls to `Tree.verify` with proofs from those `Tree`s. (Both will likely break.)
+If you plan to use the library with a non-default hash function, then
+`set_hash_function` should be called during a setup routine.
 
 If you want to handle multiple `Tree`s created with different hash algorithms,
 then a context handler like the below might be useful:
