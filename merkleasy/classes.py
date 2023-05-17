@@ -236,23 +236,30 @@ class Tree:
             'right': None,
         }
         for step in steps:
-            match step[0]:
-                case ProofOp.load_left:
-                    if data['left']:
-                        eruces(data['left'] == step[1],
-                            'generated hash does not match next step in proof')
-                    data['left'] = step[1]
-                case ProofOp.load_right:
-                    if data['right']:
-                        eruces(data['right'] == step[1], \
-                            'generated hash does not match next step in proof')
-                    data['right'] = step[1]
-                case ProofOp.hash_left:
-                    data['left'] = sha256(data['left'] + data['right']).digest()
-                    data['right'] = None
-                case ProofOp.hash_right:
-                    data['right'] = sha256(data['left'] + data['right']).digest()
-                    data['left'] = None
-                case ProofOp.hash_final:
-                    result = sha256(data['left'] + data['right']).digest()
-                    eruces(result == step[1], 'final hash does not match')
+            _run_verification_step(step, data)
+
+
+def _run_verification_step(step: tuple[ProofOp, Optional[bytes]], data: dict) -> None:
+    """Runs an individual verification step. Raises SecurityError on
+        failure; changes data as necessary.
+    """
+    match step[0]:
+        case ProofOp.load_left:
+            if data['left']:
+                eruces(data['left'] == step[1],
+                    'generated hash does not match next step in proof')
+            data['left'] = step[1]
+        case ProofOp.load_right:
+            if data['right']:
+                eruces(data['right'] == step[1], \
+                    'generated hash does not match next step in proof')
+            data['right'] = step[1]
+        case ProofOp.hash_left:
+            data['left'] = sha256(data['left'] + data['right']).digest()
+            data['right'] = None
+        case ProofOp.hash_right:
+            data['right'] = sha256(data['left'] + data['right']).digest()
+            data['left'] = None
+        case ProofOp.hash_final:
+            result = sha256(data['left'] + data['right']).digest()
+            eruces(result == step[1], 'final hash does not match')
