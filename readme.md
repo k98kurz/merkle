@@ -34,6 +34,36 @@ many unintended behaviors. It uses `randint` and many repetitions to ensure that
 the test is thorough. The tests are also a form of technical documentation; any
 questions about the code can likely be answered by reading through them.
 
+# Classes
+
+- `ImplementationError(BaseException)`
+- `UsagePreconditionError(BaseException)`
+- `SecurityError(BaseException)`
+- `Tree`
+
+The Usage section describes for each method/function which (if any) of these
+errors it can raise.
+
+# Functions and Methods
+
+- `set_hash_function(hash_function: Callable[[bytes], bytes]) -> None`
+- `get_hash_function() -> Callable`
+
+## Tree
+
+- `__init__(self, left: Tree | bytes, right: Tree | bytes) -> None`
+- `__str__(self) -> str`
+- `__repr__(self) -> str`
+- `__eq__(self, other: object) -> bool`
+- `__hash__(self) -> int`
+- `to_dict(self) -> dict`
+- `to_json(self, pretty: bool = False) -> str`
+- `@classmethod from_leaves(cls, leaves: list[bytes]) -> Tree`
+- `@classmethod from_dict(cls, data: dict) -> Tree`
+- `@classmethod from_json(cls, data: str) -> Tree`
+- `prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]`
+- `@staticmethod verify(root: bytes, leaf: bytes, proof: list[bytes]) -> None`
+
 # Usage
 
 Usage examples are shown below.
@@ -50,6 +80,8 @@ tree = Tree.from_leaves(leaves)
 ```
 
 Note that all leaves are hashed by the `from_leaves` method.
+
+Raises `UsagePreconditionError` upon invalid input.
 
 ## Tree.__init__
 
@@ -78,6 +110,8 @@ tree = Tree(
 )
 ```
 
+Raises `UsagePreconditionError` upon invalid input.
+
 ## Tree.to_dict and Tree.from_dict
 
 A Tree structure can be converted to a dict and back.
@@ -89,6 +123,11 @@ tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 converted = tree.to_dict()
 deconverted = Tree.from_dict(converted)
 ```
+
+`Tree.from_dict` raises any of the following upon invalid input:
+- `UsagePreconditionError`
+- `ValueError`
+- `SecurityError`
 
 ## Tree.to_json and Tree.from_json
 
@@ -103,6 +142,12 @@ pretty = tree.to_json(pretty=True)
 deserialized = Tree.from_json(serialized)
 assert deserialized == Tree.from_json(pretty)
 ```
+
+`Tree.from_json` raises any of the following upon invalid input:
+- `json.decoder.JSONDecodeError`
+- `UsagePreconditionError`
+- `ValueError`
+- `SecurityError`
 
 ## Tree.prove
 
@@ -125,6 +170,8 @@ for manual inspection by including intermediate, calculated values. However, the
 functionality exists as a side-effect of preventing malicious proofs from
 tricking the validator -- `test_Tree_verify_does_not_validate_malicious_proof`
 contains an example attack.
+
+Raises `UsagePreconditionError` upon invalid input.
 
 ## Tree.verify
 
@@ -170,9 +217,9 @@ This static method parses the proof, interpreting the first byte in each proof
 step as a code from `interfaces.ProofOp`. It ensures that the proof starts with
 the leaf and ends with the root, and then it follows the proof operations.
 
-If the call to `Tree.verify` is provided invalid parameters or an invalid proof,
-it will throw an `AssertionError` or `ValueError`. If all checks pass, it
-executes without error and returns `None`.
+Raises `UsagePreconditionError` when provided invalid parameters. Raises
+`SecurityError` when provided an invalid proof. If all checks pass, it executes
+without error and returns `None`.
 
 ## get_hash_function
 
@@ -197,10 +244,12 @@ from merkleasy import set_hash_function
 set_hash_function(lambda preimage: sha3_256(preimage).digest())
 ```
 
+Raises `ImplementationError` if the Callable parameter passed in does not meet
+the requirements.
+
 Note that calling `set_hash_function` will have no effect on any `Tree`s created
-prior. However, it _will_ affect any calls to `prove` on those `Tree`s or any
-calls to `Tree.verify` with proofs from those `Tree`s. (Both will likely break.)
-If you plan to use the library with a non-default hash function, then
+prior. However, it _will_ affect any calls to `Tree.verify` with proofs from
+those `Tree`s. If you plan to use the library with a custom hash function, then
 `set_hash_function` should be called during a setup routine.
 
 If you want to handle multiple `Tree`s created with different hash algorithms,
@@ -232,7 +281,6 @@ tree1 = Tree.from_leaves(leaves)
 tree2 = alt_create_tree(leaves)
 assert tree1 != tree2
 ```
-
 
 # Security / Usage Note
 
