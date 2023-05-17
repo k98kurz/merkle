@@ -32,12 +32,41 @@ class ProofOp(Enum):
 
 
 class Tree:
-    root: bytes
-    left: Tree | bytes
-    right: Tree | bytes
-    parent: Optional[Tree]
-    left_bytes: bytes
-    right_bytes: bytes
+    _root: bytes
+    _parent: Optional[Tree]
+    _left: Tree | bytes
+    _right: Tree | bytes
+    _left_bytes: bytes
+    _right_bytes: bytes
+
+    @property
+    def root(self) -> bytes:
+        return self._root
+
+    @property
+    def parent(self) -> Optional[Tree]:
+        return self._parent
+
+    @parent.setter
+    def parent(self, parent) -> None:
+        tressa(isinstance(parent, Tree) or parent is None, 'invalid parent')
+        self._parent = parent
+
+    @property
+    def left(self) -> Tree | bytes:
+        return self._left
+
+    @property
+    def right(self) -> Tree | bytes:
+        return self._right
+
+    @property
+    def left_bytes(self) -> Tree | bytes:
+        return self._left_bytes
+
+    @property
+    def right_bytes(self) -> Tree | bytes:
+        return self._right_bytes
 
     def __init__(self, left: Tree | bytes, right: Tree | bytes) -> None:
         """Set the left, right, and calculated root."""
@@ -46,8 +75,8 @@ class Tree:
         tressa(type(right) in (Tree, bytes, bytearray),
             'right must be one of Tree, bytes, bytearray')
 
-        self.left = left if type(left) in (Tree, bytes) else bytes(left)
-        self.right = right if type(right) in (Tree, bytes) else bytes(right)
+        self._left = left if type(left) in (Tree, bytes) else bytes(left)
+        self._right = right if type(right) in (Tree, bytes) else bytes(right)
         self.parent = None
 
         if type(self.left) is Tree:
@@ -55,9 +84,9 @@ class Tree:
         if type(self.right) is Tree:
             self.right.parent = self
 
-        self.left_bytes = self.left.root if isinstance(self.left, Tree) else self.left
-        self.right_bytes = self.right.root if isinstance(self.right, Tree) else self.right
-        self.root = get_hash_function()(self.left_bytes + self.right_bytes)
+        self._left_bytes = self.left.root if isinstance(self.left, Tree) else self.left
+        self._right_bytes = self.right.root if isinstance(self.right, Tree) else self.right
+        self._root = get_hash_function()(self.left_bytes + self.right_bytes)
 
     def __str__(self) -> str:
         """Return the root, left, and right in hexadecimal."""
