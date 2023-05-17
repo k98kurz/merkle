@@ -132,21 +132,9 @@ class Tree:
         # hash all leaves
         parts = [get_hash_function()(leaf) for leaf in leaves]
 
-        def join(parts) -> list[Tree]:
-            new_parts = []
-
-            # join every two together
-            for i in range(0, len(parts), 2):
-                if i+1 < len(parts):
-                    new_parts.append(Tree(parts[i], parts[i+1]))
-                else:
-                    new_parts.append(parts[i])
-
-            return new_parts
-
         # recursively join until reaching the root
         while len(parts) > 1:
-            parts = join(parts)
+            parts = _join(parts)
 
         return parts[0]
 
@@ -247,6 +235,19 @@ class Tree:
         for step in steps:
             _run_verification_step(step, data)
 
+
+def _join(parts: list[bytes|Tree]) -> list[Tree]:
+    """Joins every two items together, returning the resulting list of Trees."""
+    new_parts = []
+
+    # join every two together
+    for i in range(0, len(parts), 2):
+        if i+1 < len(parts):
+            new_parts.append(Tree(parts[i], parts[i+1]))
+        else:
+            new_parts.append(parts[i])
+
+    return new_parts
 
 def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list:
     """Returns form [(hash, parent, history),...]."""
