@@ -101,9 +101,7 @@ class Tree:
             tressa(isinstance(leaf, bytes), 'leaves must be tuple or list of bytes')
 
         # hash all leaves
-        leaves = [*leaves]
-        for i in range(len(leaves)):
-            leaves[i] = sha256(leaves[i]).digest()
+        parts = [sha256(leaf).digest() for leaf in leaves]
 
         def join(parts) -> list[Tree]:
             new_parts = []
@@ -118,7 +116,6 @@ class Tree:
             return new_parts
 
         # recursively join until reaching the root
-        parts = leaves
         while len(parts) > 1:
             parts = join(parts)
 
