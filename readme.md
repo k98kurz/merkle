@@ -38,60 +38,6 @@ questions about the code can likely be answered by reading through them.
 
 Usage examples are shown below.
 
-## set_hash_function
-
-The package uses sha256 by default, but it can be used with any hash function.
-This is accomplished by passing a callable that takes a bytes parameter, applies
-a hash algorithm, and returns a bytes value. For example, to use sha3_256:
-
-```python
-from hashlib import sha3_256
-from merkleasy import set_hash_function
-
-set_hash_function(lambda preimage: sha3_256(preimage).digest())
-```
-
-Note that calling `set_hash_function` will have no effect on any `Tree`s created
-prior. If you plan to use the library with a non-default hash function, then
-`set_hash_function` should be called during a setup routine.
-
-If you want to handle multiple `Tree`s created with different hash algorithms,
-then a context handler like the below might be useful:
-
-```python
-from hashlib import sha3_256
-from merkleasy import set_hash_function, get_hash_function, Tree
-
-
-class HashAlgoSwitch:
-    """Context manager for switching out algorithms for Tree use."""
-    def __init__(self, new_hash_function) -> None:
-        self.original_hash_function = get_hash_function()
-        set_hash_function(new_hash_function)
-    def __enter__(self) -> None:
-        return
-    def __exit__(self, __exc_type, __exc_value, __traceback) -> None:
-        set_hash_function(self.original_hash_function)
-
-
-leaves = [b'one', b'two', b'three']
-tree1 = Tree.from_leaves(leaves)
-
-with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
-    tree2 = Tree.from_leaves(leaves)
-    assert tree1 != tree2
-```
-
-## get_hash_function
-
-To access the currently-set hash function, use the following:
-
-```python
-from merkleasy import get_hash_function
-
-hash_function = get_hash_function()
-```
-
 ## Tree.from_leaves
 
 The easiest way to use this to create a Merkle Tree is with `from_leaves`:
@@ -227,6 +173,60 @@ the leaf and ends with the root, and then it follows the proof operations.
 If the call to `Tree.verify` is provided invalid parameters or an invalid proof,
 it will throw an `AssertionError` or `ValueError`. If all checks pass, it
 executes without error and returns `None`.
+
+## set_hash_function
+
+The package uses sha256 by default, but it can be used with any hash function.
+This is accomplished by passing a callable that takes a bytes parameter, applies
+a hash algorithm, and returns a bytes value. For example, to use sha3_256:
+
+```python
+from hashlib import sha3_256
+from merkleasy import set_hash_function
+
+set_hash_function(lambda preimage: sha3_256(preimage).digest())
+```
+
+Note that calling `set_hash_function` will have no effect on any `Tree`s created
+prior. If you plan to use the library with a non-default hash function, then
+`set_hash_function` should be called during a setup routine.
+
+If you want to handle multiple `Tree`s created with different hash algorithms,
+then a context handler like the below might be useful:
+
+```python
+from hashlib import sha3_256
+from merkleasy import set_hash_function, get_hash_function, Tree
+
+
+class HashAlgoSwitch:
+    """Context manager for switching out algorithms for Tree use."""
+    def __init__(self, new_hash_function) -> None:
+        self.original_hash_function = get_hash_function()
+        set_hash_function(new_hash_function)
+    def __enter__(self) -> None:
+        return
+    def __exit__(self, __exc_type, __exc_value, __traceback) -> None:
+        set_hash_function(self.original_hash_function)
+
+
+leaves = [b'one', b'two', b'three']
+tree1 = Tree.from_leaves(leaves)
+
+with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
+    tree2 = Tree.from_leaves(leaves)
+    assert tree1 != tree2
+```
+
+## get_hash_function
+
+To access the currently-set hash function, use the following:
+
+```python
+from merkleasy import get_hash_function
+
+hash_function = get_hash_function()
+```
 
 
 # Security / Usage Note
