@@ -2,12 +2,12 @@
 
 This is a simple-to-use implementation of the concept of Merklized data
 structures, e.g. the Merkle Tree and the Merkle Mountain Range. There is a
-single class, `merkleasy.Tree`, with a simple interface. See the Usage section for
-details. This uses sha256 as the hash algorithm.
+single main class, `merkleasy.Tree`, three error classes, and two configuration
+functions. See the Usage section for details. This uses sha256 as the default
+hash algorithm, but it can use any in theory.
 
 # Status
 
-- [x] Interface
 - [x] Tests
 - [x] Implementation
 - [x] Proofs
@@ -22,24 +22,75 @@ pip install merkleasy
 
 # Testing
 
-To develop or test, fork or clone the repo. There are no dependencies.
+To develop or test, fork or clone the repo and install the dependency.
 
-There is just one test file. Run it with the following:
+## Windows Setup
+
+```bash
+python -m venv venv/
+source venv/Scripts/activate
+pip install pycelium-specifications
+```
+
+## *nix Setup
+
+```bash
+python -m venv venv/
+source venv/bin/activate
+pip install pycelium-specifications
+```
+
+## Running Tests
+
+There are two test files: the first is a unit test suite; the second is a
+specification compliance test. Run them with the following:
 
 ```bash
 python tests/test_classes.py
+python tests/test_specification.py
 ```
 
-This file demonstrates all the intended behaviors of the class and rules out
-many unintended behaviors. It uses `randint` and many repetitions to ensure that
-the test is thorough. The tests are also a form of technical documentation; any
-questions about the code can likely be answered by reading through them.
+These files demonstrate all the intended behaviors of the class and rule out
+many unintended behaviors. They use `randint` and many repetitions to ensure
+that the test suite is thorough. The tests are also a form of technical
+documentation; any questions about the code can likely be answered by reading
+through them.
+
+# Classes
+
+- `ImplementationError(BaseException)`
+- `UsagePreconditionError(BaseException)`
+- `SecurityError(BaseException)`
+- `Tree`
+
+The Usage section describes for each method/function which (if any) of these
+errors it can raise.
+
+# Functions and Methods
+
+- `set_hash_function(hash_function: Callable[[bytes], bytes]) -> None`
+- `get_hash_function() -> Callable`
+
+## Tree
+
+- `__init__(self, left: Tree | bytes, right: Tree | bytes) -> None`
+- `__str__(self) -> str`
+- `__repr__(self) -> str`
+- `__eq__(self, other: object) -> bool`
+- `__hash__(self) -> int`
+- `to_dict(self) -> dict`
+- `to_json(self, pretty: bool = False) -> str`
+- `@classmethod from_leaves(cls, leaves: list[bytes]) -> Tree`
+- `@classmethod from_dict(cls, data: dict) -> Tree`
+- `@classmethod from_json(cls, data: str) -> Tree`
+- `prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]`
+- `@staticmethod verify(root: bytes, leaf: bytes, proof: list[bytes]) -> None`
 
 # Usage
 
 Usage examples are shown below.
 
-## from_leaves
+## Tree.from_leaves
 
 The easiest way to use this to create a Merkle Tree is with `from_leaves`:
 
@@ -52,7 +103,9 @@ tree = Tree.from_leaves(leaves)
 
 Note that all leaves are hashed by the `from_leaves` method.
 
-## __init__
+Raises `UsagePreconditionError` upon invalid input.
+
+## Tree.__init__
 
 To make custom Merklized data structures, use the `__init__` method:
 
@@ -65,17 +118,23 @@ leaf2 = sha256(b'leaf2').digest()
 leaf3 = sha256(b'leaf3').digest()
 leaf4 = sha256(b'leaf4').digest()
 leaf5 = sha256(b'leaf5').digest()
+another_whole_tree = Tree.from_leaves([b'123', b'456', b'789'])
 
 tree = Tree(
-    leaf1,
     Tree(
-        Tree(leaf2, leaf3),
-        Tree(leaf4, leaf5)
-    )
+        leaf1,
+        Tree(
+            Tree(leaf2, leaf3),
+            Tree(leaf4, leaf5)
+        )
+    ),
+    another_whole_tree
 )
 ```
 
-## to_dict and from_dict
+Raises `UsagePreconditionError` upon invalid input.
+
+## Tree.to_dict and Tree.from_dict
 
 A Tree structure can be converted to a dict and back.
 
@@ -87,7 +146,12 @@ converted = tree.to_dict()
 deconverted = Tree.from_dict(converted)
 ```
 
-## to_json and from_json
+`Tree.from_dict` raises any of the following upon invalid input:
+- `UsagePreconditionError`
+- `ValueError`
+- `SecurityError`
+
+## Tree.to_json and Tree.from_json
 
 Serialization and deserialization of a structure uses `to_json` and `from_json`:
 
@@ -101,7 +165,13 @@ deserialized = Tree.from_json(serialized)
 assert deserialized == Tree.from_json(pretty)
 ```
 
-## prove
+`Tree.from_json` raises any of the following upon invalid input:
+- `json.decoder.JSONDecodeError`
+- `UsagePreconditionError`
+- `ValueError`
+- `SecurityError`
+
+## Tree.prove
 
 Inclusion proofs can be generated using the `prove` method:
 
@@ -123,7 +193,9 @@ functionality exists as a side-effect of preventing malicious proofs from
 tricking the validator -- `test_Tree_verify_does_not_validate_malicious_proof`
 contains an example attack.
 
-## verify
+Raises `UsagePreconditionError` upon invalid input.
+
+## Tree.verify
 
 Inclusion proofs can be verified using `Tree.verify`:
 
@@ -167,10 +239,70 @@ This static method parses the proof, interpreting the first byte in each proof
 step as a code from `interfaces.ProofOp`. It ensures that the proof starts with
 the leaf and ends with the root, and then it follows the proof operations.
 
-If the call to `Tree.verify` is provided invalid parameters or an invalid proof,
-it will throw an `AssertionError` or `ValueError`. If all checks pass, it
-executes without error and returns `None`.
+Raises `UsagePreconditionError` when provided invalid parameters. Raises
+`SecurityError` when provided an invalid proof. If all checks pass, it executes
+without error and returns `None`.
 
+## get_hash_function
+
+To access the currently-set hash function, use the following:
+
+```python
+from merkleasy import get_hash_function
+
+hash_function = get_hash_function()
+```
+
+## set_hash_function
+
+The package uses sha256 by default, but it can be used with any hash function.
+This is accomplished by passing a Callable that takes a bytes parameter, applies
+a hash algorithm, and returns a bytes value. For example, to use sha3_256:
+
+```python
+from hashlib import sha3_256
+from merkleasy import set_hash_function
+
+set_hash_function(lambda preimage: sha3_256(preimage).digest())
+```
+
+Raises `ImplementationError` if the Callable parameter passed in does not meet
+the requirements.
+
+Note that calling `set_hash_function` will have no effect on any `Tree`s created
+prior. However, it _will_ affect any calls to `Tree.verify` with proofs from
+those `Tree`s. If you plan to use the library with a custom hash function, then
+`set_hash_function` should be called during a setup routine.
+
+If you want to handle multiple `Tree`s created with different hash algorithms,
+then a context handler like the below might be useful:
+
+```python
+from hashlib import sha3_256
+from merkleasy import set_hash_function, get_hash_function, Tree
+
+
+class HashAlgoSwitch:
+    """Context manager for switching out algorithms for Tree use."""
+    def __init__(self, new_hash_function) -> None:
+        self.original_hash_function = get_hash_function()
+        set_hash_function(new_hash_function)
+    def __enter__(self) -> None:
+        return
+    def __exit__(self, __exc_type, __exc_value, __traceback) -> None:
+        set_hash_function(self.original_hash_function)
+
+
+def alt_create_tree(leaves) -> Tree:
+    with HashAlgoSwitch(lambda data: sha3_256(data).digest()):
+        return Tree.from_leaves(leaves)
+
+
+leaves = [b'one', b'two', b'three']
+tree1 = Tree.from_leaves(leaves)
+tree2 = alt_create_tree(leaves)
+assert tree1 != tree2
+```
 
 # Security / Usage Note
 
