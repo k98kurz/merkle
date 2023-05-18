@@ -40,7 +40,7 @@ source venv/bin/activate
 pip install pycelium-specifications
 ```
 
-## Running Tests Suite
+## Running Tests
 
 There are two test files: the first is a unit test suite; the second is a
 specification compliance test. Run them with the following:
