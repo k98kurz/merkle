@@ -22,18 +22,39 @@ pip install merkleasy
 
 # Testing
 
-To develop or test, fork or clone the repo. There are no dependencies.
+To develop or test, fork or clone the repo and install the dependency.
 
-There is just one test file. Run it with the following:
+## Windows Setup
+
+```bash
+python -m venv venv/
+source venv/Scripts/activate
+pip install pycelium-specifications
+```
+
+## *nix Setup
+
+```bash
+python -m venv venv/
+source venv/bin/activate
+pip install pycelium-specifications
+```
+
+## Running Tests Suite
+
+There are two test files: the first is a unit test suite; the second is a
+specification compliance test. Run them with the following:
 
 ```bash
 python tests/test_classes.py
+python tests/test_specification.py
 ```
 
-This file demonstrates all the intended behaviors of the class and rules out
-many unintended behaviors. It uses `randint` and many repetitions to ensure that
-the test is thorough. The tests are also a form of technical documentation; any
-questions about the code can likely be answered by reading through them.
+These files demonstrate all the intended behaviors of the class and rule out
+many unintended behaviors. They use `randint` and many repetitions to ensure
+that the test suite is thorough. The tests are also a form of technical
+documentation; any questions about the code can likely be answered by reading
+through them.
 
 # Classes
 
