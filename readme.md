@@ -90,7 +90,7 @@ errors it can raise.
 
 Usage examples are shown below.
 
-## Tree.from_leaves
+## `Tree.from_leaves`
 
 The easiest way to use this to create a Merkle Tree is with `from_leaves`:
 
@@ -105,7 +105,7 @@ Note that all leaves are hashed by the `from_leaves` method.
 
 Raises `UsagePreconditionError` upon invalid input.
 
-## Tree.__init__
+## `Tree.__init__`
 
 To make custom Merklized data structures, use the `__init__` method:
 
@@ -134,7 +134,7 @@ tree = Tree(
 
 Raises `UsagePreconditionError` upon invalid input.
 
-## Tree.to_dict and Tree.from_dict
+## `Tree.to_dict` and `Tree.from_dict`
 
 A Tree structure can be converted to a dict and back.
 
@@ -142,8 +142,9 @@ A Tree structure can be converted to a dict and back.
 from merkleasy import Tree
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
-converted = tree.to_dict()
-deconverted = Tree.from_dict(converted)
+serialized = tree.to_dict()
+deserialized = Tree.from_dict(serialized)
+assert deserialized == tree
 ```
 
 `Tree.from_dict` raises any of the following upon invalid input:
@@ -151,7 +152,7 @@ deconverted = Tree.from_dict(converted)
 - `ValueError`
 - `SecurityError`
 
-## Tree.to_json and Tree.from_json
+## `Tree.to_json` and `Tree.from_json`
 
 Serialization and deserialization of a structure uses `to_json` and `from_json`:
 
@@ -171,7 +172,7 @@ assert deserialized == Tree.from_json(pretty)
 - `ValueError`
 - `SecurityError`
 
-## Tree.prove
+## `Tree.prove`
 
 Inclusion proofs can be generated using the `prove` method:
 
@@ -195,12 +196,12 @@ contains an example attack.
 
 Raises `UsagePreconditionError` upon invalid input.
 
-## Tree.verify
+## `Tree.verify`
 
 Inclusion proofs can be verified using `Tree.verify`:
 
 ```py
-from merkleasy import Tree
+from merkleasy import Tree, UsagePreconditionError, SecurityError
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 leaf = b'leaf1'
@@ -211,26 +212,43 @@ try:
     Tree.verify(tree.root, leaf, proof1)
     # expected result
     print(f'verified proof {[p.hex() for p in proof1]} for {leaf=}')
+except UsagePreconditionError as e:
+    print(f'invalid use of library: {e}')
 except ValueError as e:
-    print('invalid proof supplied')
-except AssertionError as e:
+    print(f'invalid proof supplied: {e}')
+except SecurityError as e:
+    print(f'error encountered: {e}')
+
+try:
+    Tree.verify('some string', leaf, proof1)
+    print(f'verified proof {[p.hex() for p in proof1]} for {leaf=}')
+except UsagePreconditionError as e:
+    # expected result
+    print(f'invalid use of library: {e}')
+except ValueError as e:
+    print(f'invalid proof supplied: {e}')
+except SecurityError as e:
     print(f'error encountered: {e}')
 
 try:
     Tree.verify(tree.root, leaf, [b'\x99', *proof2])
     print(f'verified proof {[p.hex() for p in proof2]} for {leaf=}')
+except UsagePreconditionError as e:
+    print(f'invalid use of library: {e}')
 except ValueError as e:
     # expected result
-    print('invalid proof supplied')
-except AssertionError as e:
+    print(f'invalid proof supplied: {e}')
+except SecurityError as e:
     print(f'error encountered: {e}')
 
 try:
     Tree.verify(tree.root, leaf, proof2)
     print(f'verified proof {[p.hex() for p in proof2]} for {leaf=}')
+except UsagePreconditionError as e:
+    print(f'invalid use of library: {e}')
 except ValueError as e:
-    print('invalid proof supplied')
-except AssertionError as e:
+    print(f'invalid proof supplied: {e}')
+except SecurityError as e:
     # expected result
     print(f'error encountered: {e}')
 ```
@@ -239,31 +257,35 @@ This static method parses the proof, interpreting the first byte in each proof
 step as a code from `interfaces.ProofOp`. It ensures that the proof starts with
 the leaf and ends with the root, and then it follows the proof operations.
 
-Raises `UsagePreconditionError` when provided invalid parameters. Raises
-`SecurityError` when provided an invalid proof. If all checks pass, it executes
-without error and returns `None`.
+Raises `UsagePreconditionError` or `ValueError` when provided invalid parameters.
+Raises `SecurityError` when provided an invalid proof. If all checks pass, it
+executes without error and returns `None`.
 
-## get_hash_function
+## `get_hash_function`
 
 To access the currently-set hash function, use the following:
 
-```python
+```py
 from merkleasy import get_hash_function
 
 hash_function = get_hash_function()
+print(hash_function(b'abc').hex())
+# ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 ```
 
-## set_hash_function
+## `set_hash_function`
 
 The package uses sha256 by default, but it can be used with any hash function.
 This is accomplished by passing a Callable that takes a bytes parameter, applies
 a hash algorithm, and returns a bytes value. For example, to use sha3_256:
 
-```python
+```py
 from hashlib import sha3_256
-from merkleasy import set_hash_function
+from merkleasy import set_hash_function, get_hash_function
 
 set_hash_function(lambda preimage: sha3_256(preimage).digest())
+print(get_hash_function()(b'abc'))
+# 3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532
 ```
 
 Raises `ImplementationError` if the Callable parameter passed in does not meet
@@ -277,7 +299,7 @@ those `Tree`s. If you plan to use the library with a custom hash function, then
 If you want to handle multiple `Tree`s created with different hash algorithms,
 then a context handler like the below might be useful:
 
-```python
+```py
 from hashlib import sha3_256
 from merkleasy import set_hash_function, get_hash_function, Tree
 
