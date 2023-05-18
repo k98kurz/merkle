@@ -29,7 +29,7 @@ To develop or test, fork or clone the repo and install the dependency.
 ```bash
 python -m venv venv/
 source venv/Scripts/activate
-pip install pycelium-specifications
+pip install pycelium-specifications==0.0.2.2
 ```
 
 ## *nix Setup
@@ -37,7 +37,7 @@ pip install pycelium-specifications
 ```bash
 python -m venv venv/
 source venv/bin/activate
-pip install pycelium-specifications
+pip install pycelium-specifications==0.0.2.2
 ```
 
 ## Running Tests
