@@ -104,9 +104,9 @@ class TestVM(unittest.TestCase):
         assert max_hash != vm._EMPTY_HASHES[-1]
 
     def test_load_empty_ops(self):
-        program = vm.OpCodes.load_empty_left.value.to_bytes(1, 'big')
+        program = bytes(vm.OpCodes.load_empty_left)
         program += (0).to_bytes(1, 'big')
-        program += vm.OpCodes.load_empty_right.value.to_bytes(1, 'big')
+        program += bytes(vm.OpCodes.load_empty_right)
         program += (123).to_bytes(1, 'big')
         prover = vm.VirtualMachine(program)
         prover.run()
@@ -115,8 +115,8 @@ class TestVM(unittest.TestCase):
 
         left = vm._EMPTY_HASHES[0]
         right = vm._EMPTY_HASHES[123]
-        root = vm.get_hash_function()(b'\x01' + left + right)
-        program += vm.OpCodes.hash_final_hsize.value.to_bytes(1, 'big')
+        root = vm.hash_node(left, right)
+        program += bytes(vm.OpCodes.hash_final_hsize)
         program += root
         prover = vm.VirtualMachine(program)
         assert prover.run()
