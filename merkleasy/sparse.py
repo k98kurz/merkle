@@ -19,24 +19,33 @@ class SparseSubTree:
     def prove(self) -> list[bytes]:
         """Create an inclusion proof for this SpareSubTree."""
         leaf_hash = hash_leaf(self.leaf)
+
         bitmap = []
         for i in range(self.level):
             bitmap.extend([
-                0b00000001 & leaf_hash[i] != 0,
-                0b00000010 & leaf_hash[i] != 0,
-                0b00000100 & leaf_hash[i] != 0,
-                0b00001000 & leaf_hash[i] != 0,
-                0b00010000 & leaf_hash[i] != 0,
-                0b00100000 & leaf_hash[i] != 0,
-                0b01000000 & leaf_hash[i] != 0,
                 0b10000000 & leaf_hash[i] != 0,
+                0b01000000 & leaf_hash[i] != 0,
+                0b00100000 & leaf_hash[i] != 0,
+                0b00010000 & leaf_hash[i] != 0,
+                0b00001000 & leaf_hash[i] != 0,
+                0b00000100 & leaf_hash[i] != 0,
+                0b00000010 & leaf_hash[i] != 0,
+                0b00000001 & leaf_hash[i] != 0,
             ])
-        proof = [
-            bytes(OpCodes.load_left) + len(leaf_hash).to_bytes(1, 'big') + leaf_hash,
-            bytes(OpCodes.load_empty_right) + b'\x00'
-        ]
-        accumulated = leaf_hash
 
+        proof = []
+        if bitmap[0]:
+            proof.extend([
+                bytes(OpCodes.load_left) + len(leaf_hash).to_bytes(1, 'big') + leaf_hash,
+                bytes(OpCodes.load_empty_right) + b'\x00'
+            ])
+        else:
+            proof.extend([
+                bytes(OpCodes.load_right) + len(leaf_hash).to_bytes(1, 'big') + leaf_hash,
+                bytes(OpCodes.load_empty_left) + b'\x00'
+            ])
+
+        accumulated = leaf_hash
         for i in range(1, self.level):
             if bitmap[i]:
                 proof.extend([
@@ -58,8 +67,8 @@ class SparseSubTree:
 
         return proof
 
-
     def pack(self) -> bytes:
+        """Pack the SparseSubTree into bytes."""
         return struct.pack(
             f"!H{len(self.leaf)}s",
             self.level,
@@ -68,6 +77,7 @@ class SparseSubTree:
 
     @classmethod
     def unpack(cls, data: bytes) -> SparseSubTree:
+        """Unpack a SpareSubTree from bytes."""
         level, leaf = struct.unpack(f"!H{len(data)-1}s", data)
         return cls(level=level, leaf=leaf)
 
