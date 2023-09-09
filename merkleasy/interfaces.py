@@ -24,6 +24,10 @@ class VMProtocol(Protocol):
         """
         ...
 
+    def insert_code(self, code: bytes) -> None:
+        """Inserts code at the current pointer."""
+        ...
+
     def set_register(self, name: Hashable, value: Any) -> None:
         """Sets the specified register to the given value."""
         ...

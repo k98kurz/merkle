@@ -76,6 +76,8 @@ class TestSparseTree(unittest.TestCase):
     def test_from_leaves(self):
         sparse = classes.SparseTree.from_leaves(self.leaves)
         assert isinstance(sparse, classes.SparseTree)
+        print(sparse.treemap)
+        print(sparse.root.hex())
 
 
 if __name__ == '__main__':

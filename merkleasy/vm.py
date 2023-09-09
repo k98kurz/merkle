@@ -45,6 +45,8 @@ class OpCodes(Enum):
     hash_final = 12
     subroutine_left = 13
     subroutine_right = 14
+    hash_to_level = 15
+    hash_to_level_hsize = 16
 
     def __bytes__(self) -> bytes:
         return self.value.to_bytes(1, 'big')
@@ -76,8 +78,7 @@ def hash_left(vm: VMProtocol):
     """Puts hash(0x01 | left | right) into left register."""
     left = vm.get_register('left')
     right = vm.get_register('right')
-    # left = get_hash_function()(left + right)
-    left = get_hash_function()(b'\x01' + left + right)
+    left = hash_node(left, right)
     vm.set_register('left', left)
     vm.set_register('right', b'')
 
@@ -85,8 +86,7 @@ def hash_right(vm: VMProtocol):
     """Puts hash(0x01 | left | right) into right register."""
     left = vm.get_register('left')
     right = vm.get_register('right')
-    # right = get_hash_function()(left + right)
-    right = get_hash_function()(b'\x01' + left + right)
+    right = hash_node(left, right)
     vm.set_register('right', right)
     vm.set_register('left', b'')
 
@@ -99,8 +99,7 @@ def hash_final_hsize(vm: VMProtocol):
     expected_root = vm.read(size)
     left = vm.get_register('left')
     right = vm.get_register('right')
-    # observed_root = get_hash_function()(left + right)
-    observed_root = get_hash_function()(b'\x01' + left + right)
+    observed_root = hash_node(left, right)
     vm.set_register('final', observed_root == expected_root)
     vm.set_register('return', observed_root)
 
@@ -137,8 +136,7 @@ def hash_leaf_left(vm: VMProtocol):
     """Puts hash(0x00 | left | right) into left register."""
     left = vm.get_register('left')
     right = vm.get_register('right')
-    # left = get_hash_function()(left + right)
-    left = get_hash_function()(b'\x00' + left + right)
+    left = hash_leaf(left + right)
     vm.set_register('left', left)
     vm.set_register('right', b'')
 
@@ -146,8 +144,7 @@ def hash_leaf_right(vm: VMProtocol):
     """Puts hash(0x00 | left | right) into right register."""
     left = vm.get_register('left')
     right = vm.get_register('right')
-    # right = get_hash_function()(left + right)
-    right = get_hash_function()(b'\x00' + left + right)
+    right = hash_leaf(left + right)
     vm.set_register('right', right)
     vm.set_register('left', b'')
 
@@ -161,8 +158,7 @@ def hash_final(vm: VMProtocol):
     expected_root = vm.read(size)
     left = vm.get_register('left')
     right = vm.get_register('right')
-    # observed_root = get_hash_function()(left + right)
-    observed_root = get_hash_function()(b'\x01' + left + right)
+    observed_root = hash_node(left, right)
     vm.set_register('final', observed_root == expected_root)
     vm.set_register('return', observed_root)
 
@@ -198,6 +194,77 @@ def subroutine_right(vm: VMProtocol):
         eruces(right == result, 'cannot overwrite register')
     vm.set_register('right', result)
 
+def hash_to_level(vm: VMProtocol):
+    """Read next 2 bytes as uint8 from_level and to_level. Read next 2
+        bytes as uint16 size. Read size bytes as bit path. Hash against
+        empty node until reaching to_level, then put the result in the
+        return register.
+    """
+    from_level = vm.read(1)[0]
+    to_level = vm.read(1)[0]
+    size = int.from_bytes(vm.read(2), 'big')
+    path_bytes = vm.read(size)
+    path_bits = []
+    for i in range(size):
+        path_bits.extend([
+            0b10000000 & path_bytes[i] != 0,
+            0b01000000 & path_bytes[i] != 0,
+            0b00100000 & path_bytes[i] != 0,
+            0b00010000 & path_bytes[i] != 0,
+            0b00001000 & path_bytes[i] != 0,
+            0b00000100 & path_bytes[i] != 0,
+            0b00000010 & path_bytes[i] != 0,
+            0b00000001 & path_bytes[i] != 0,
+        ])
+
+    for i in range(from_level, to_level):
+        if not path_bits[i]:
+            hash_left(vm)
+            vm.insert_code(i.to_bytes(1, 'big'))
+            load_empty_right(vm)
+        else:
+            hash_right(vm)
+            vm.insert_code(i.to_bytes(1, 'big'))
+            load_empty_left(vm)
+    hash_left(vm)
+    vm.set_register('return', vm.get_register('left'))
+    vm.set_register('left', b'')
+
+def hash_to_level_hsize(vm: VMProtocol):
+    """Read next 2 bytes as uint8 from_level and to_level. Read size
+        from register. Read size bytes as bit path. Hash against empty
+        node until reaching to_level, then put the result in the return
+        register.
+    """
+    from_level = vm.read(1)[0]
+    to_level = vm.read(1)[0]
+    size = vm.get_register('size')
+    path_bytes = vm.read(size)
+    path_bits = []
+    for i in range(size):
+        path_bits.extend([
+            0b10000000 & path_bytes[i] != 0,
+            0b01000000 & path_bytes[i] != 0,
+            0b00100000 & path_bytes[i] != 0,
+            0b00010000 & path_bytes[i] != 0,
+            0b00001000 & path_bytes[i] != 0,
+            0b00000100 & path_bytes[i] != 0,
+            0b00000010 & path_bytes[i] != 0,
+            0b00000001 & path_bytes[i] != 0,
+        ])
+
+    for i in range(from_level, to_level):
+        if not path_bits[i]:
+            hash_left(vm)
+            vm.insert_code(i.to_bytes(1, 'big'))
+            load_empty_right(vm)
+        else:
+            hash_right(vm)
+            vm.insert_code(i.to_bytes(1, 'big'))
+            load_empty_left(vm)
+    hash_left(vm)
+    vm.set_register('return', vm.get_register('left'))
+    vm.set_register('left', b'')
 
 _EMPTY_HASHES = []
 
@@ -205,7 +272,7 @@ def compute_empty_hashes(empty_leaf: bytes = b''):
     while len(_EMPTY_HASHES):
         _EMPTY_HASHES.pop()
     _EMPTY_HASHES.append(get_hash_function()(b'\x00' + empty_leaf))
-    for i in range(0, 254):
+    for i in range(0, 255):
         preimage = _EMPTY_HASHES[i]
         _EMPTY_HASHES.append(get_hash_function()(b'\x01' + preimage + preimage))
 
@@ -252,6 +319,8 @@ instruction_set = {
     OpCodes.load_empty_left: load_empty_left,
     OpCodes.load_empty_right: load_empty_right,
     OpCodes.hash_final: hash_final,
+    OpCodes.hash_to_level: hash_to_level,
+    OpCodes.hash_to_level_hsize: hash_to_level_hsize,
 }
 
 
@@ -305,6 +374,10 @@ class VirtualMachine:
             return True
         except:
             return False
+
+    def insert_code(self, code: bytes) -> None:
+        """Inserts code at the current pointer."""
+        self.program = self.program[:self.pointer] + code + self.program[self.pointer:]
 
     def set_register(self, name: str, value: bytes) -> None:
         """Sets the specified register to the given value."""

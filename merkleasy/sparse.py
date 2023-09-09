@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from math import ceil
+from .errors import tressa
 from .serialization import serialize_part, deserialize_part
 from .vm import (
     OpCodes,
@@ -16,10 +17,11 @@ class SparseSubTree:
     leaf: bytes = field()
     level: int = field()
 
-    def get_bitmap(self) -> list[bool]:
+    def get_bitmap(self, min_level: int = 8) -> list[bool]:
+        """Gets the path from leaf to root for the leaf."""
         leaf_hash = hash_leaf(self.leaf)
         bitmap = []
-        for i in range(max(ceil(self.level/8), 1)):
+        for i in range(max(ceil(self.level/8), ceil(min_level/8), 1)):
             bitmap.extend([
                 0b10000000 & leaf_hash[i] != 0,
                 0b01000000 & leaf_hash[i] != 0,
@@ -88,6 +90,10 @@ class SparseSubTree:
 
         return proof
 
+    def root(self) -> bytes:
+        """Returns the calculated root."""
+        return self.prove()[-1][1:]
+
     def pack(self) -> bytes:
         """Pack the SparseSubTree into bytes."""
         return serialize_part([
@@ -116,11 +122,27 @@ class SparseSubTree:
 @dataclass
 class SparseTree:
     subtrees: list[SparseSubTree] = field(default_factory=list)
+    treemap: dict[int, tuple[int]] = field(default_factory=dict)
+    root: bytes = field(default=b'')
+
+    @staticmethod
+    def hash_up_to(node: bytes, bitmap: list[bool], start_level: int,
+                   end_level: int) -> bytes:
+        """Hash up to the proper level."""
+        # print(f"hash_up_to {node.hex()=} {len(bitmap)=} {start_level=} {end_level=}")
+        for i in range(start_level, end_level):
+            if not bitmap[i]:
+                node = hash_node(node, get_empty_hash(i))
+            else:
+                node = hash_node(get_empty_hash(i), node)
+        return node
 
     @classmethod
     def from_leaves(cls, leaves: list[bytes]) -> SparseTree:
         lhf = len(hash_leaf(leaves[0]))
-        subtrees = [SparseSubTree(leaf, lhf * 8) for leaf in leaves]
+        subtrees: list[SparseSubTree] = [
+            SparseSubTree(leaf, lhf * 8) for leaf in leaves
+        ]
         intersections = []
 
         for i in range(len(subtrees)):
@@ -149,14 +171,132 @@ class SparseTree:
             if level < treemap[j][0]:
                 treemap[j] = [level, i]
 
-        # for subtree in subtrees:
-        #     print(subtree)
-        # print('\n', intersections, '\n')
+        accumulators = {
+            i: {
+                'level': subtrees[i].level,
+                'value': subtrees[i].root(),
+            }
+            for i,_ in treemap.items()
+        }
 
-        # for k, v in treemap.items():
-        #     print(f"{k}: {v}")
+        for nt in intersections:
+            i, j, level = nt
+            if treemap[i] != [level, j]:
+                continue
+            if accumulators[i]['level'] < level:
+                accumulators[i]['value'] = cls.hash_up_to(
+                    accumulators[i]['value'],
+                    subtrees[i].get_bitmap(),
+                    accumulators[i]['level'],
+                    level
+                )
+            if accumulators[j]['level'] < level:
+                accumulators[j]['value'] = cls.hash_up_to(
+                    accumulators[j]['value'],
+                    subtrees[j].get_bitmap(),
+                    accumulators[j]['level'],
+                    level
+                )
+            go_left = not subtrees[i].get_bitmap()[subtrees[i].level]
+            if go_left:
+                accumulators[i]['value'] = hash_node(
+                    accumulators[i]['value'],
+                    accumulators[j]['value'],
+                )
+            else:
+                accumulators[i]['value'] = hash_node(
+                    accumulators[j]['value'],
+                    accumulators[i]['value'],
+                )
 
-        return cls(subtrees=subtrees)
+        accumulators = [(k, v) for k,v in accumulators.items()]
+        accumulators.sort(key=lambda a: a[1]['level'], reverse=True)
+
+        root = cls.hash_up_to(
+            accumulators[-1][1]['value'],
+            subtrees[accumulators[-1][0]].get_bitmap(min_level=lhf*8),
+            accumulators[-1][1]['level'],
+            lhf*8,
+        )
+
+
+        return cls(
+            subtrees=subtrees,
+            treemap=treemap,
+            root=root
+        )
+
+    def prove(self, leaf: bytes) -> bytes:
+        """Prove leaf inclusion. Proof takes form of VM bytecode."""
+        tressa(leaf in [t.leaf for t in self.subtrees], 'unrecognized leaf')
+
+        subtree = [t for t in self.subtrees if t.leaf == leaf][0]
+        index = 0
+        for i in range(len(self.subtrees)):
+            if self.subtrees[i] == subtree:
+                index = i
+                break
+        proof = subtree.prove()
+        hash_bit_size = len(proof[-1][1:])*8
+        full_path = subtree.get_bitmap(min_level=hash_bit_size)
+
+        if not full_path[subtree.level]:
+            proof.insert(0, bytes(OpCodes.subroutine_left))
+        else:
+            proof.insert(0, bytes(OpCodes.subroutine_right))
+
+        accumulators = {
+            i: {
+                'level': self.subtrees[i].level,
+                'value': self.subtrees[i].root(),
+            }
+            for i,_ in self.treemap.items()
+        }
+        intersections = [
+            (k, v[1], v[0])
+            for k, v in self.treemap.items()
+        ]
+
+        for nt in intersections:
+            i, j, level = nt
+            if self.treemap[i] != [level, j]:
+                continue
+            if accumulators[i]['level'] < level:
+                accumulators[i]['value'] = self.hash_up_to(
+                    accumulators[i]['value'],
+                    self.subtrees[i].get_bitmap(),
+                    accumulators[i]['level'],
+                    level
+                )
+            if accumulators[j]['level'] < level:
+                accumulators[j]['value'] = self.hash_up_to(
+                    accumulators[j]['value'],
+                    self.subtrees[j].get_bitmap(),
+                    accumulators[j]['level'],
+                    level
+                )
+            go_left = not self.subtrees[i].get_bitmap()[self.subtrees[i].level]
+            if go_left:
+                accumulators[i]['value'] = hash_node(
+                    accumulators[i]['value'],
+                    accumulators[j]['value'],
+                )
+            else:
+                accumulators[i]['value'] = hash_node(
+                    accumulators[j]['value'],
+                    accumulators[i]['value'],
+                )
+
+        accumulators = [(k, v) for k,v in accumulators.items()]
+        accumulators.sort(key=lambda a: a[1]['level'], reverse=True)
+        hash_bit_size = len(accumulators[0][1]['value'])*8
+
+        root = self.hash_up_to(
+            accumulators[-1][1]['value'],
+            self.subtrees[accumulators[-1][0]].get_bitmap(min_level=hash_bit_size),
+            accumulators[-1][1]['level'],
+            hash_bit_size,
+        )
 
     def pack(self) -> bytes:
         """Serialize to bytes."""

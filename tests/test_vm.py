@@ -95,7 +95,7 @@ class TestVM(unittest.TestCase):
     def test_compute_hashes_e2e(self):
         assert len(vm._EMPTY_HASHES) == 0
         vm.compute_empty_hashes()
-        assert len(vm._EMPTY_HASHES) == 255
+        assert len(vm._EMPTY_HASHES) == 256
 
         max_hash = vm._EMPTY_HASHES[-1]
 
@@ -120,6 +120,19 @@ class TestVM(unittest.TestCase):
         program += root
         prover = vm.VirtualMachine(program)
         assert prover.run()
+
+    def test_hash_to_level_ops(self):
+        leaf = b'123'
+        leaf_hash = vm.hash_leaf(leaf)
+        program = bytes(vm.OpCodes.load_left) + (3).to_bytes(2, 'big') + leaf
+        if leaf_hash[0] & 0b10000000:
+            program += bytes(vm.OpCodes.hash_leaf_right)
+        else:
+            program += bytes(vm.OpCodes.hash_leaf_left)
+        program += bytes(vm.OpCodes.hash_to_level_hsize) + b'\x01' + b'\x09' + leaf_hash
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        assert len(prover.get_register('return')) == 32
 
 
 if __name__ == '__main__':
