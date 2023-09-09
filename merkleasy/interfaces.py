@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum
 from typing import Any, Callable, Hashable, Protocol, runtime_checkable
 
@@ -29,4 +30,18 @@ class VMProtocol(Protocol):
 
     def get_register(self, name: Hashable) -> Any:
         """Returns the value of the specified register."""
+        ...
+
+
+@runtime_checkable
+class PackableProtocol(Protocol):
+    def pack(self) -> bytes:
+        """Packs the instance into bytes."""
+        ...
+
+    @classmethod
+    def unpack(cls, data: bytes, /, *, inject: dict = {}) -> PackableProtocol:
+        """Unpacks an instance from bytes. Must accept dependency
+            injection to unpack other Packable types.
+        """
         ...
