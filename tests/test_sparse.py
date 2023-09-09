@@ -50,7 +50,11 @@ class TestSparseSubTree(unittest.TestCase):
         assert type(proof) is list
         for step in proof:
             assert type(step) is bytes
-        assert len(proof) == 2*st1.level + 2
+        assert len(proof) == 2*st1.level + 3
+
+        # important for saving bytecode size across whole proof
+        assert vm.OpCodes(proof[0][0]) is vm.OpCodes.set_hsize
+        assert vm.OpCodes(proof[-1][0]) is vm.OpCodes.hash_final_hsize
 
     def test_proof_validates(self):
         st1 = classes.SparseSubTree(leaf=b'123', level=2)

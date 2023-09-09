@@ -50,18 +50,20 @@ class SparseSubTree:
         bitmap = self.get_bitmap()
 
         proof = [
-            bytes(OpCodes.set_hsize) + len(leaf_hash).to_bytes(1, 'big')
+            bytes(OpCodes.set_hsize) + len(leaf_hash).to_bytes(1, 'big'),
         ]
         accumulated = leaf_hash
         if not bitmap[0]:
             proof.extend([
-                bytes(OpCodes.load_left_hsize) + leaf_hash,
+                bytes(OpCodes.load_left) + len(self.leaf).to_bytes(2, 'big') + self.leaf,
+                bytes(OpCodes.hash_leaf_left),
                 bytes(OpCodes.load_empty_right) + b'\x00'
             ])
             accumulated = hash_node(accumulated, get_empty_hash(0))
         else:
             proof.extend([
-                bytes(OpCodes.load_right_hsize) + leaf_hash,
+                bytes(OpCodes.load_right) + len(self.leaf).to_bytes(2, 'big') + self.leaf,
+                bytes(OpCodes.hash_leaf_right),
                 bytes(OpCodes.load_empty_left) + b'\x00'
             ])
             accumulated = hash_node(get_empty_hash(0), accumulated)
