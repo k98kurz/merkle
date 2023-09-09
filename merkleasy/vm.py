@@ -112,10 +112,10 @@ def set_hsize(vm: VMProtocol):
     vm.set_register('size', size)
 
 def load_left(vm: VMProtocol):
-    """Reads next byte, interpreting as an int. Reads that many bytes
+    """Reads next 2 bytes, interpreting as uint16. Reads that many bytes
         into the left register.
     """
-    size = vm.read(1)[0]
+    size = int.from_bytes(vm.read(2), 'big')
     left = vm.read(size)
     if vm.get_register('left'):
         eruces(vm.get_register('left') == left,
@@ -123,10 +123,10 @@ def load_left(vm: VMProtocol):
     vm.set_register('left', left)
 
 def load_right(vm: VMProtocol):
-    """Reads next byte, interpreting as an int. Reads that many bytes
+    """Reads next 2 bytes, interpreting as uint16. Reads that many bytes
         into the right register.
     """
-    size = vm.read(1)[0]
+    size = int.from_bytes(vm.read(2), 'big')
     right = vm.read(size)
     if vm.get_register('left'):
         eruces(vm.get_register('right') == right,
