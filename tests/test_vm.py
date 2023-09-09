@@ -4,6 +4,18 @@ import unittest
 
 
 class TestVM(unittest.TestCase):
+    def setUp(self) -> None:
+        self.original_hash_fn = vm.get_hash_function()
+        while len(vm._EMPTY_HASHES):
+            vm._EMPTY_HASHES.pop()
+        return super().setUp()
+
+    def tearDown(self) -> None:
+        vm.set_hash_function(self.original_hash_fn)
+        while len(vm._EMPTY_HASHES):
+            vm._EMPTY_HASHES.pop()
+        return super().tearDown()
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.leaves = [i.to_bytes(1, 'big') for i in range(10)]
@@ -79,6 +91,35 @@ class TestVM(unittest.TestCase):
 
         prover = vm.VirtualMachine(vm.adapt_legacy_proof(malicious_proof))
         assert not prover.run()
+
+    def test_compute_hashes_e2e(self):
+        assert len(vm._EMPTY_HASHES) == 0
+        vm.compute_empty_hashes()
+        assert len(vm._EMPTY_HASHES) == 255
+
+        max_hash = vm._EMPTY_HASHES[-1]
+
+        vm.set_hash_function(lambda p: sha3_256(p).digest())
+        vm.compute_empty_hashes()
+        assert max_hash != vm._EMPTY_HASHES[-1]
+
+    def test_load_empty_ops(self):
+        program = vm.OpCodes.load_empty_left.value.to_bytes(1, 'big')
+        program += (0).to_bytes(1, 'big')
+        program += vm.OpCodes.load_empty_right.value.to_bytes(1, 'big')
+        program += (123).to_bytes(1, 'big')
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        assert prover.registers['left'] == vm._EMPTY_HASHES[0]
+        assert prover.registers['right'] == vm._EMPTY_HASHES[123]
+
+        left = vm._EMPTY_HASHES[0]
+        right = vm._EMPTY_HASHES[123]
+        root = vm.get_hash_function()(b'\x01' + left + right)
+        program += vm.OpCodes.hash_final_hsize.value.to_bytes(1, 'big')
+        program += root
+        prover = vm.VirtualMachine(program)
+        assert prover.run()
 
 
 if __name__ == '__main__':

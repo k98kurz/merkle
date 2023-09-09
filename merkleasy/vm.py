@@ -152,19 +152,44 @@ def set_hash_size(vm: VMProtocol):
     size = vm.read(1)[0]
     vm.set_register('size', size)
 
+_EMPTY_HASHES = []
+
+def compute_empty_hashes(empty_leaf: bytes = b''):
+    while len(_EMPTY_HASHES):
+        _EMPTY_HASHES.pop()
+    _EMPTY_HASHES.append(get_hash_function()(b'\x00' + empty_leaf))
+    for i in range(0, 254):
+        preimage = _EMPTY_HASHES[i]
+        _EMPTY_HASHES.append(get_hash_function()(b'\x01' + preimage + preimage))
+
+def get_empty_hash(level: int):
+    if not _EMPTY_HASHES:
+        compute_empty_hashes()
+    return _EMPTY_HASHES[level]
+
 def load_empty_left(vm: VMProtocol):
     """Reads the next byte, interpreting as uint8. Loads the recursively
         hashed empty leaf for that level of the Sparse Merkle Tree into
         the left register.
     """
-    ...
+    level = vm.read(1)[0]
+    hash = get_empty_hash(level)
+    left = vm.get_register('left')
+    if left:
+        eruces(left == hash, 'cannot overwrite register')
+    vm.set_register('left', hash)
 
 def load_empty_right(vm: VMProtocol):
     """Reads the next byte, interpreting as uint8. Loads the recursively
         hashed empty leaf for that level of the Sparse Merkle Tree into
         the right register.
     """
-    ...
+    level = vm.read(1)[0]
+    hash = get_empty_hash(level)
+    right = vm.get_register('right')
+    if right:
+        eruces(right == hash, 'cannot overwrite register')
+    vm.set_register('right', hash)
 
 instruction_set = {
     OpCodes.load_hash_left: load_hash_left,
