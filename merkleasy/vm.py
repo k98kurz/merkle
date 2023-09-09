@@ -30,12 +30,12 @@ def hash_node(left: bytes, right: bytes) -> bytes:
 
 
 class OpCodes(Enum):
-    load_hash_left = 0
-    load_hash_right = 1
+    load_left_hsize = 0
+    load_right_hsize = 1
     hash_left = 2
     hash_right = 3
     hash_final_hsize = 4
-    set_hash_size = 5
+    set_hsize = 5
     load_left = 6
     load_right = 7
     hash_leaf_left = 8
@@ -50,7 +50,7 @@ class OpCodes(Enum):
         return self.value.to_bytes(1, 'big')
 
 
-def load_hash_left(vm: VMProtocol):
+def load_left_hsize(vm: VMProtocol):
     """Reads the size register, then reads that many bytes into the left
         register.
     """
@@ -61,7 +61,7 @@ def load_hash_left(vm: VMProtocol):
                'cannot overwrite register')
     vm.set_register('left', left)
 
-def load_hash_right(vm: VMProtocol):
+def load_right_hsize(vm: VMProtocol):
     """Reads the size register, then reads that many bytes into the
         right register.
     """
@@ -102,8 +102,9 @@ def hash_final_hsize(vm: VMProtocol):
     # observed_root = get_hash_function()(left + right)
     observed_root = get_hash_function()(b'\x01' + left + right)
     vm.set_register('final', observed_root == expected_root)
+    vm.set_register('return', observed_root)
 
-def set_hash_size(vm: VMProtocol):
+def set_hsize(vm: VMProtocol):
     """Reads next byte, interpreting as uint8. Set the 'size' register
         to that value.
     """
@@ -238,12 +239,12 @@ def load_empty_right(vm: VMProtocol):
     vm.set_register('right', hash)
 
 instruction_set = {
-    OpCodes.load_hash_left: load_hash_left,
-    OpCodes.load_hash_right: load_hash_right,
+    OpCodes.load_left_hsize: load_left_hsize,
+    OpCodes.load_right_hsize: load_right_hsize,
     OpCodes.hash_left: hash_left,
     OpCodes.hash_right: hash_right,
     OpCodes.hash_final_hsize: hash_final_hsize,
-    OpCodes.set_hash_size: set_hash_size,
+    OpCodes.set_hsize: set_hsize,
     OpCodes.load_left: load_left,
     OpCodes.load_right: load_right,
     OpCodes.hash_leaf_left: hash_leaf_left,
@@ -255,7 +256,7 @@ instruction_set = {
 
 
 def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
-    return OpCodes.set_hash_size.value.to_bytes(1, 'big') + \
+    return OpCodes.set_hsize.value.to_bytes(1, 'big') + \
         (hash_size).to_bytes(1, 'big') + b''.join(proof)
 
 

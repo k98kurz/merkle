@@ -1,5 +1,6 @@
 from __future__ import annotations
 from .errors import ImplementationError, tressa, eruces
+from .sparse import SparseSubTree, SparseTree
 from enum import Enum
 from hashlib import sha256
 from typing import Callable, Optional
