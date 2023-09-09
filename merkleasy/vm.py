@@ -1,4 +1,4 @@
-from .errors import ImplementationError, eruces
+from .errors import ImplementationError, SecurityError, eruces
 from .interfaces import VMProtocol
 from enum import Enum
 from hashlib import sha256
@@ -22,6 +22,12 @@ def set_hash_function(hash_function: Callable[[bytes], bytes]) -> None:
 def get_hash_function() -> Callable[[bytes], bytes]:
     return _HASH_FUNCTION
 
+def hash_leaf(data: bytes) -> bytes:
+    return get_hash_function()(b'\x00' + data)
+
+def hash_node(left: bytes, right: bytes) -> bytes:
+    return get_hash_function()(b'\x01' + left + right)
+
 
 class OpCodes(Enum):
     load_hash_left = 0
@@ -37,6 +43,11 @@ class OpCodes(Enum):
     load_empty_left = 10
     load_empty_right = 11
     hash_final = 12
+    subroutine_left = 13
+    subroutine_right = 14
+
+    def __bytes__(self) -> bytes:
+        return self.value.to_bytes(1, 'big')
 
 
 def load_hash_left(vm: VMProtocol):
@@ -92,6 +103,13 @@ def hash_final_hsize(vm: VMProtocol):
     observed_root = get_hash_function()(b'\x01' + left + right)
     vm.set_register('final', observed_root == expected_root)
 
+def set_hash_size(vm: VMProtocol):
+    """Reads next byte, interpreting as uint8. Set the 'size' register
+        to that value.
+    """
+    size = vm.read(1)[0]
+    vm.set_register('size', size)
+
 def load_left(vm: VMProtocol):
     """Reads next byte, interpreting as an int. Reads that many bytes
         into the left register.
@@ -135,7 +153,8 @@ def hash_leaf_right(vm: VMProtocol):
 def hash_final(vm: VMProtocol):
     """Reads next byte, interpreting as an int. Read that many bytes as
         root hash. Calculates hash(0x01 | left | right). Puts True in
-        final register if they match and False otherwise.
+        final register if they match and False otherwise. Puts the
+        calculated final hash in the return register.
     """
     size = vm.read(1)[0]
     expected_root = vm.read(size)
@@ -144,13 +163,40 @@ def hash_final(vm: VMProtocol):
     # observed_root = get_hash_function()(left + right)
     observed_root = get_hash_function()(b'\x01' + left + right)
     vm.set_register('final', observed_root == expected_root)
+    vm.set_register('return', observed_root)
 
-def set_hash_size(vm: VMProtocol):
-    """Reads next byte, interpreting as uint8. Set the 'size' register
-        to that value.
+def subroutine_left(vm: VMProtocol):
+    """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
+        the subroutine in a new VM. Subroutine must end with successful
+        final_hash, then that hash will be put in the left register.
     """
-    size = vm.read(1)[0]
-    vm.set_register('size', size)
+    size = int.from_bytes(vm.read(2), 'big')
+    subroutine = vm.read(size)
+    subvm = vm.__class__(subroutine)
+    if not subvm.run():
+        raise SecurityError("subroutine failed")
+    left = vm.get_register('left')
+    result = subvm.get_register('return')
+    if left:
+        eruces(left == result, 'cannot overwrite register')
+    vm.set_register('left', result)
+
+def subroutine_right(vm: VMProtocol):
+    """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
+        the subroutine in a new VM. Subroutine must end with successful
+        final_hash, then that hash will be put in the right register.
+    """
+    size = int.from_bytes(vm.read(2), 'big')
+    subroutine = vm.read(size)
+    subvm = vm.__class__(subroutine)
+    if not subvm.run():
+        raise SecurityError("subroutine failed")
+    right = vm.get_register('right')
+    result = subvm.get_register('return')
+    if right:
+        eruces(right == result, 'cannot overwrite register')
+    vm.set_register('right', result)
+
 
 _EMPTY_HASHES = []
 
@@ -229,6 +275,7 @@ class VirtualMachine:
             'right': b'',
             'final': False,
             'size': 32,
+            'return': None,
         }
 
     def run(self) -> bool:
