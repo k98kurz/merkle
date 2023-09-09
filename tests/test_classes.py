@@ -18,9 +18,9 @@ class TestMerkle(unittest.TestCase):
 
     def test_Tree_joins_left_and_right_into_root(self):
         classes.set_hash_function(lambda data: sha3_256(data).digest())
-        left = sha3_256(b'hello').digest()
-        right = sha3_256(b'world').digest()
-        joined = sha3_256(left + right).digest()
+        left = sha3_256(b'\x00hello').digest()
+        right = sha3_256(b'\x00world').digest()
+        joined = sha3_256(b'\x01' + left + right).digest()
         tree = classes.Tree(left, right)
 
         assert hasattr(tree, 'root')
@@ -29,9 +29,9 @@ class TestMerkle(unittest.TestCase):
 
     def test_Tree_from_leaves_hashes_and_joins_leaves(self):
         leaves = [b'hello', b'world']
-        left_hash = sha256(leaves[0]).digest()
-        right_hash = sha256(leaves[1]).digest()
-        root = sha256(left_hash + right_hash).digest()
+        left_hash = sha256(b'\x00' + leaves[0]).digest()
+        right_hash = sha256(b'\x00' + leaves[1]).digest()
+        root = sha256(b'\x01' + left_hash + right_hash).digest()
 
         assert hasattr(classes.Tree, 'from_leaves')
         tree = classes.Tree.from_leaves(leaves)
@@ -252,7 +252,7 @@ class TestMerkle(unittest.TestCase):
         with self.assertRaises(errors.SecurityError) as e:
             # raises errors.SecurityError to prevent proof hijacking
             classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
-        assert str(e.exception) == 'generated hash does not match next step in proof'
+        assert str(e.exception) == 'proof does not reference leaf'
 
         # try to trick the validator by using a proof for a different tree
         malicious_proof = classes.Tree.from_leaves([b'malicious', b'leaves']).prove(b'malicious')

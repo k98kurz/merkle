@@ -87,7 +87,7 @@ class Tree:
 
         self._left_bytes = self.left.root if isinstance(self.left, Tree) else self.left
         self._right_bytes = self.right.root if isinstance(self.right, Tree) else self.right
-        self._root = get_hash_function()(self.left_bytes + self.right_bytes)
+        self._root = get_hash_function()(b'\x01' + self.left_bytes + self.right_bytes)
 
     def __str__(self) -> str:
         """Return the root, left, and right in hexadecimal."""
@@ -130,7 +130,7 @@ class Tree:
             tressa(isinstance(leaf, bytes), 'leaves must be tuple or list of bytes')
 
         # hash all leaves
-        parts = [get_hash_function()(leaf) for leaf in leaves]
+        parts = [get_hash_function()(b'\x00' + leaf) for leaf in leaves]
 
         # recursively join until reaching the root
         while len(parts) > 1:
@@ -164,7 +164,7 @@ class Tree:
             hash checks at each tree level.
         """
         tressa(type(leaf) is bytes, 'leaf must be bytes')
-        leaf_hash = get_hash_function()(leaf)
+        leaf_hash = get_hash_function()(b'\x00' + leaf)
 
         # get set of nodes
         nodes = set(_traverse(self, tuple(), False))
@@ -217,7 +217,7 @@ class Tree:
         tressa(type(proof) is list, 'proof must be list of bytes')
 
         # parsing proof
-        leaf_hash = get_hash_function()(leaf)
+        leaf_hash = get_hash_function()(b'\x00' + leaf)
         steps = []
         for step in proof:
             # another precondition
@@ -284,11 +284,11 @@ def _run_verification_step(step: tuple[ProofOp, Optional[bytes]], data: dict) ->
                     'generated hash does not match next step in proof')
             data['right'] = step[1]
         case ProofOp.hash_left:
-            data['left'] = get_hash_function()(data['left'] + data['right'])
+            data['left'] = get_hash_function()(b'\x01' + data['left'] + data['right'])
             data['right'] = None
         case ProofOp.hash_right:
-            data['right'] = get_hash_function()(data['left'] + data['right'])
+            data['right'] = get_hash_function()(b'\x01' + data['left'] + data['right'])
             data['left'] = None
         case ProofOp.hash_final:
-            result = get_hash_function()(data['left'] + data['right'])
+            result = get_hash_function()(b'\x01' + data['left'] + data['right'])
             eruces(result == step[1], 'final hash does not match')
