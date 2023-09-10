@@ -129,10 +129,21 @@ class TestVM(unittest.TestCase):
             program += bytes(vm.OpCodes.hash_leaf_right)
         else:
             program += bytes(vm.OpCodes.hash_leaf_left)
-        program += bytes(vm.OpCodes.hash_to_level_hsize) + b'\x01' + b'\x09' + leaf_hash
+        program += bytes(vm.OpCodes.hash_to_level_hsize) + b'\x00' + b'\x09' + leaf_hash
         prover = vm.VirtualMachine(program)
+
         prover.run()
-        assert len(prover.get_register('return')) == 32
+        hash1 = prover.get_register('return')
+        assert len(hash1) == 32
+
+        # check against SparseSubTree
+        sst = classes.SparseSubTree(leaf=leaf, level=9)
+        proof = sst.prove()
+        program = b''.join(proof)
+        prover = vm.VirtualMachine(program)
+        assert prover.run()
+        hash2 = prover.get_register('return')
+        assert hash1 == hash2, f"{hash1.hex()}\n{hash2.hex()}"
 
 
 if __name__ == '__main__':
