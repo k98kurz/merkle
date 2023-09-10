@@ -35,18 +35,28 @@ class OpCodes(Enum):
     hash_left = 2
     hash_right = 3
     hash_final_hsize = 4
-    set_hsize = 5
-    load_left = 6
-    load_right = 7
-    hash_leaf_left = 8
-    hash_leaf_right = 9
-    load_empty_left = 10
-    load_empty_right = 11
-    hash_final = 12
-    subroutine_left = 13
-    subroutine_right = 14
-    hash_to_level = 15
-    hash_to_level_hsize = 16
+    hash_mid = 5
+    hash_leaf_left = 6
+    hash_leaf_right = 7
+    hash_leaf_mid = 8
+    hash_leaf_bit = 9
+    hash_bit = 10
+    hash_final = 11
+    hash_to_level = 12
+    hash_with_empty = 13
+    hash_to_level_hsize = 14
+    hash_to_level_path = 15
+    load_left = 20
+    load_right = 21
+    load_empty_left = 22
+    load_empty_right = 23
+    set_hsize = 30
+    set_path = 31
+    set_path_hsize = 32
+    set_path_auto = 33
+    get_path_bit = 34
+    subroutine_left = 40
+    subroutine_right = 41
 
     def __bytes__(self) -> bytes:
         return self.value.to_bytes(1, 'big')
@@ -108,6 +118,16 @@ def hash_final_hsize(vm: VMProtocol):
     vm.set_register('return', observed_root)
     vm.debug('hash_final_hsize', observed_root.hex())
 
+def hash_mid(vm: VMProtocol):
+    """Read left and right registers. Put hash_node(left, right) into
+        return register.
+    """
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    result = hash_node(left, right)
+    vm.set_register('return', result)
+    vm.debug('hash_mid', result.hex())
+
 def set_hsize(vm: VMProtocol):
     """Reads next byte, interpreting as uint8. Set the 'size' register
         to that value.
@@ -158,6 +178,40 @@ def hash_leaf_right(vm: VMProtocol):
     vm.set_register('left', b'')
     vm.debug('hash_leaf_right', right.hex())
 
+def hash_leaf_mid(vm: VMProtocol):
+    """Read left and right registers. Put hash_leaf(left + right) into
+        return register.
+    """
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    result = hash_leaf(left + right)
+    vm.set_register('return', result)
+    vm.debug('hash_leaf_mid', result.hex())
+
+def hash_leaf_bit(vm: VMProtocol):
+    """Read left, right, and bit registers. If bit, put hash_leaf(left +
+        right) into right register; else, put hash_leaf(left + right)
+        into left register.
+    """
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    bit = vm.get_register('bit')
+    result = hash_leaf(left + right)
+    vm.set_register('right' if bit else 'left', result)
+    vm.debug('hash_leaf_bit', bit, result.hex())
+
+def hash_bit(vm: VMProtocol):
+    """Read left, right, and bit registers. If bit, put hash_node(left,
+        right) into right register; else, put hash_node(left, right)
+        into left register.
+    """
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    bit = vm.get_register('bit')
+    result = hash_node(left, right)
+    vm.set_register('right' if bit else 'left', result)
+    vm.debug('hash_bit', bit, result.hex())
+
 def hash_final(vm: VMProtocol):
     """Reads next byte, interpreting as an int. Read that many bytes as
         root hash. Calculates hash(0x01 | left | right). Puts True in
@@ -206,6 +260,51 @@ def subroutine_right(vm: VMProtocol):
         eruces(right == result, 'cannot overwrite register')
     vm.set_register('right', result)
     vm.debug('subroutine_right', result.hex())
+
+def set_path(vm: VMProtocol):
+    """Read next 2 bytes as uint16 size. Read size bytes into path
+        register.
+    """
+    size = int.from_bytes(vm.read(2), 'big')
+    path = vm.read(size)
+    vm.debug('set_path', path.hex())
+    vm.set_register('path', path)
+
+def set_path_hsize(vm: VMProtocol):
+    """Read size register. Read size bytes into path register."""
+    size = vm.get_register('size')
+    path = vm.read(size)
+    vm.debug('set_path_hsize', path.hex())
+    vm.set_register('path', path)
+
+def set_path_auto(vm: VMProtocol):
+    """If the left register is not empty, load it into the path register.
+        If the right register is not empty, load it into the path
+        register.
+    """
+    left = vm.get_register('left')
+    if left:
+        vm.set_register('path', left)
+        vm.debug('set_path_auto', 'l', left.hex())
+    else:
+        right = vm.get_register('right')
+        vm.set_register('path', right)
+        vm.debug('set_path_auto', 'r', right.hex())
+
+def get_path_bit(vm: VMProtocol):
+    """Read next byte as uint8 index. Get the bit at the index from the
+        byte_path register and put into bit register.
+    """
+    index = vm.read(1)[0]
+    path = vm.get_register('path')
+    byte_index = index // 8
+    bit_index = index - byte_index*8
+    path_byte = path[byte_index]
+    path = "{0:b}".format(path_byte)
+    path = "".join(["0" for _ in range(8-len(path))]) + path
+    bit = path[bit_index] == "1"
+    vm.set_register('bit', bit)
+    vm.debug('get_path_bit', bit)
 
 def hash_to_level(vm: VMProtocol):
     """Read next 2 bytes as uint8 from_level and to_level. Read next 2
@@ -296,6 +395,52 @@ def hash_to_level_hsize(vm: VMProtocol):
     vm.debug('hash_to_level_hsize', 'end', vm.get_register('return').hex(),
              decrement_context=True)
 
+def hash_with_empty(vm: VMProtocol):
+    """Read next byte as uint8 index. Read bit register. Load the
+        recursively hashed empty node into the empty register (left or
+        right), then hash_node and put the result in the register
+        indicated by bit.
+    """
+    index = vm.read(1)[0]
+    bit = vm.get_register('bit')
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    empty = get_empty_hash(index)
+    if left:
+        right = empty
+    else:
+        left = empty
+    result = hash_node(left, right)
+
+    if not bit:
+        vm.set_register('left', result)
+        vm.set_register('right', b'')
+    else:
+        vm.set_register('right', result)
+        vm.set_register('left', b'')
+    vm.debug('hash_with_empty', index, bit, result.hex())
+
+def hash_to_level_path(vm: VMProtocol):
+    """Read the next 2 bytes as uint8 from_level and to_level. Read the
+        path register. Hash against recursively hashed empty node until
+        reaching to_level starting at from_level, then put the result in
+        the return register.
+    """
+    from_level = vm.read(1)[0]
+    to_level = vm.read(1)[0]
+    path = vm.get_register('path')
+    vm.debug('hash_to_level_path', 'start', path.hex(), increment_context=True)
+    for i in range(from_level, to_level):
+        vm.insert_code((i+1).to_bytes(1, 'big'))
+        get_path_bit(vm)
+        vm.insert_code(i.to_bytes(1, 'big'))
+        hash_with_empty(vm)
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    result = left or right
+    vm.set_register('return', result)
+    vm.debug('hash_to_level_path', 'end', result.hex(), decrement_context=True)
+
 _EMPTY_HASHES = []
 
 def compute_empty_hashes(empty_leaf: bytes = b''):
@@ -306,7 +451,7 @@ def compute_empty_hashes(empty_leaf: bytes = b''):
         preimage = _EMPTY_HASHES[i]
         _EMPTY_HASHES.append(get_hash_function()(b'\x01' + preimage + preimage))
 
-def get_empty_hash(level: int):
+def get_empty_hash(level: int) -> bytes:
     if not _EMPTY_HASHES:
         compute_empty_hashes()
     return _EMPTY_HASHES[level]
@@ -337,6 +482,7 @@ def load_empty_right(vm: VMProtocol):
     vm.set_register('right', hash)
     vm.debug('load_empty_right', hash.hex())
 
+
 instruction_set = {
     OpCodes.load_left_hsize: load_left_hsize,
     OpCodes.load_right_hsize: load_right_hsize,
@@ -351,8 +497,13 @@ instruction_set = {
     OpCodes.load_empty_left: load_empty_left,
     OpCodes.load_empty_right: load_empty_right,
     OpCodes.hash_final: hash_final,
+    OpCodes.set_path: set_path,
+    OpCodes.set_path_hsize: set_path_hsize,
+    OpCodes.set_path_auto: set_path_auto,
+    OpCodes.get_path_bit: get_path_bit,
     OpCodes.hash_to_level: hash_to_level,
     OpCodes.hash_to_level_hsize: hash_to_level_hsize,
+    OpCodes.hash_to_level_path: hash_to_level_path,
 }
 
 
@@ -376,6 +527,8 @@ class VirtualMachine:
         self.registers = {
             'left': b'',
             'right': b'',
+            'path': b'',
+            'bit': False,
             'final': False,
             'size': 32,
             'return': None,
