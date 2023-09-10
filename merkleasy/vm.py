@@ -233,12 +233,16 @@ def hash_to_level(vm: VMProtocol):
 
     for i in range(from_level, to_level):
         if not path_bits[i]:
-            if i != 0:
+            if i == 0:
+                hash_leaf_left(vm)
+            else:
                 hash_left(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_right(vm)
         else:
-            if i != 0:
+            if i == 0:
+                hash_leaf_right(vm)
+            else:
                 hash_right(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_left(vm)
@@ -273,12 +277,16 @@ def hash_to_level_hsize(vm: VMProtocol):
 
     for i in range(from_level, to_level):
         if not path_bits[i]:
-            if i != 0:
+            if i == 0:
+                hash_leaf_left(vm)
+            else:
                 hash_left(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_right(vm)
         else:
-            if i != 0:
+            if i == 0:
+                hash_leaf_right(vm)
+            else:
                 hash_right(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_left(vm)

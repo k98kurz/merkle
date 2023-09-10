@@ -125,10 +125,6 @@ class TestVM(unittest.TestCase):
         leaf = b'123'
         leaf_hash = vm.hash_leaf(leaf)
         program = bytes(vm.OpCodes.load_left) + (3).to_bytes(2, 'big') + leaf
-        if leaf_hash[0] & 0b10000000:
-            program += bytes(vm.OpCodes.hash_leaf_right)
-        else:
-            program += bytes(vm.OpCodes.hash_leaf_left)
         program += bytes(vm.OpCodes.hash_to_level_hsize) + b'\x00' + b'\x09' + leaf_hash
         prover = vm.VirtualMachine(program)
 

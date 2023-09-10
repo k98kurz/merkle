@@ -37,7 +37,8 @@ class VMProtocol(Protocol):
         """Returns the value of the specified register."""
         ...
 
-    def debug(self, *parts, context_change: int = 0) -> None:
+    def debug(self, *parts, increment_context: bool = False,
+              decrement_context: bool = False) -> None:
         """If debug is enabled, add a debug trace."""
         ...
 
