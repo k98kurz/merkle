@@ -6,7 +6,8 @@ from typing import Any, Callable, Hashable, Protocol, runtime_checkable
 @runtime_checkable
 class VMProtocol(Protocol):
     def __init__(self, program: bytes = b'', pointer: int = 0,
-                 instruction_set: dict[type[Enum], Callable] = {}) -> None:
+                 instruction_set: dict[type[Enum], Callable] = {},
+                 debug: bool = False) -> None:
         """Initialize a VM with the given program and instruction_set."""
         ...
 
@@ -34,6 +35,10 @@ class VMProtocol(Protocol):
 
     def get_register(self, name: Hashable) -> Any:
         """Returns the value of the specified register."""
+        ...
+
+    def debug(self, *parts) -> None:
+        """If debug is enabled, add a debug trace."""
         ...
 
 

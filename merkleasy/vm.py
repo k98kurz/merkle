@@ -62,6 +62,7 @@ def load_left_hsize(vm: VMProtocol):
         eruces(vm.get_register('left') == left,
                'cannot overwrite register')
     vm.set_register('left', left)
+    vm.debug('load_left_hsize', left.hex())
 
 def load_right_hsize(vm: VMProtocol):
     """Reads the size register, then reads that many bytes into the
@@ -73,6 +74,7 @@ def load_right_hsize(vm: VMProtocol):
         eruces(vm.get_register('right') == right,
                'cannot overwrite register')
     vm.set_register('right', right)
+    vm.debug('load_right_hsize', right.hex())
 
 def hash_left(vm: VMProtocol):
     """Puts hash(0x01 | left | right) into left register."""
@@ -81,6 +83,7 @@ def hash_left(vm: VMProtocol):
     left = hash_node(left, right)
     vm.set_register('left', left)
     vm.set_register('right', b'')
+    vm.debug('hash_left', left.hex())
 
 def hash_right(vm: VMProtocol):
     """Puts hash(0x01 | left | right) into right register."""
@@ -89,6 +92,7 @@ def hash_right(vm: VMProtocol):
     right = hash_node(left, right)
     vm.set_register('right', right)
     vm.set_register('left', b'')
+    vm.debug('hash_right', right.hex())
 
 def hash_final_hsize(vm: VMProtocol):
     """Reads size register, then reads that many bytes as root hash.
@@ -102,6 +106,7 @@ def hash_final_hsize(vm: VMProtocol):
     observed_root = hash_node(left, right)
     vm.set_register('final', observed_root == expected_root)
     vm.set_register('return', observed_root)
+    vm.debug('hash_final_hsize', observed_root.hex())
 
 def set_hsize(vm: VMProtocol):
     """Reads next byte, interpreting as uint8. Set the 'size' register
@@ -109,6 +114,7 @@ def set_hsize(vm: VMProtocol):
     """
     size = vm.read(1)[0]
     vm.set_register('size', size)
+    vm.debug('set_hsize', size)
 
 def load_left(vm: VMProtocol):
     """Reads next 2 bytes, interpreting as uint16. Reads that many bytes
@@ -120,6 +126,7 @@ def load_left(vm: VMProtocol):
         eruces(vm.get_register('left') == left,
                'cannot overwrite register')
     vm.set_register('left', left)
+    vm.debug('load_left', left.hex())
 
 def load_right(vm: VMProtocol):
     """Reads next 2 bytes, interpreting as uint16. Reads that many bytes
@@ -131,6 +138,7 @@ def load_right(vm: VMProtocol):
         eruces(vm.get_register('right') == right,
                'cannot overwrite register')
     vm.set_register('right', right)
+    vm.debug('load_right', right.hex())
 
 def hash_leaf_left(vm: VMProtocol):
     """Puts hash(0x00 | left | right) into left register."""
@@ -139,6 +147,7 @@ def hash_leaf_left(vm: VMProtocol):
     left = hash_leaf(left + right)
     vm.set_register('left', left)
     vm.set_register('right', b'')
+    vm.debug('hash_leaf_left', left.hex())
 
 def hash_leaf_right(vm: VMProtocol):
     """Puts hash(0x00 | left | right) into right register."""
@@ -147,6 +156,7 @@ def hash_leaf_right(vm: VMProtocol):
     right = hash_leaf(left + right)
     vm.set_register('right', right)
     vm.set_register('left', b'')
+    vm.debug('hash_leaf_right', right.hex())
 
 def hash_final(vm: VMProtocol):
     """Reads next byte, interpreting as an int. Read that many bytes as
@@ -161,6 +171,7 @@ def hash_final(vm: VMProtocol):
     observed_root = hash_node(left, right)
     vm.set_register('final', observed_root == expected_root)
     vm.set_register('return', observed_root)
+    vm.debug('hash_final', observed_root.hex())
 
 def subroutine_left(vm: VMProtocol):
     """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
@@ -177,6 +188,7 @@ def subroutine_left(vm: VMProtocol):
     if left:
         eruces(left == result, 'cannot overwrite register')
     vm.set_register('left', result)
+    vm.debug('subroutine_left', result.hex())
 
 def subroutine_right(vm: VMProtocol):
     """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
@@ -193,6 +205,7 @@ def subroutine_right(vm: VMProtocol):
     if right:
         eruces(right == result, 'cannot overwrite register')
     vm.set_register('right', result)
+    vm.debug('subroutine_right', result.hex())
 
 def hash_to_level(vm: VMProtocol):
     """Read next 2 bytes as uint8 from_level and to_level. Read next 2
@@ -229,6 +242,7 @@ def hash_to_level(vm: VMProtocol):
     hash_left(vm)
     vm.set_register('return', vm.get_register('left'))
     vm.set_register('left', b'')
+    vm.debug('hash_to_level', vm.get_register('return').hex())
 
 def hash_to_level_hsize(vm: VMProtocol):
     """Read next 2 bytes as uint8 from_level and to_level. Read size
@@ -265,6 +279,7 @@ def hash_to_level_hsize(vm: VMProtocol):
     hash_left(vm)
     vm.set_register('return', vm.get_register('left'))
     vm.set_register('left', b'')
+    vm.debug('hash_to_level_hsize', vm.get_register('return').hex())
 
 _EMPTY_HASHES = []
 
@@ -292,6 +307,7 @@ def load_empty_left(vm: VMProtocol):
     if left:
         eruces(left == hash, 'cannot overwrite register')
     vm.set_register('left', hash)
+    vm.debug('load_empty_left', hash.hex())
 
 def load_empty_right(vm: VMProtocol):
     """Reads the next byte, interpreting as uint8. Loads the recursively
@@ -304,6 +320,7 @@ def load_empty_right(vm: VMProtocol):
     if right:
         eruces(right == hash, 'cannot overwrite register')
     vm.set_register('right', hash)
+    vm.debug('load_empty_right', hash.hex())
 
 instruction_set = {
     OpCodes.load_left_hsize: load_left_hsize,
@@ -336,7 +353,8 @@ class VirtualMachine:
     registers: dict
 
     def __init__(self, program: bytes = b'', pointer: int = 0,
-                 instruction_set: dict[OpCodes, Callable] = instruction_set) -> None:
+                 instruction_set: dict[OpCodes, Callable] = instruction_set,
+                 debug: bool = False) -> None:
         self.program = program
         self.pointer = pointer
         self.instruction_set = instruction_set
@@ -347,6 +365,7 @@ class VirtualMachine:
             'size': 32,
             'return': None,
         }
+        self._debug_enabled = debug
 
     def run(self) -> bool:
         """Runs the program. Returns True if the proof was verified
@@ -386,3 +405,8 @@ class VirtualMachine:
     def get_register(self, name: str) -> bytes:
         """Returns the value of the specified register."""
         return self.registers[name]
+
+    def debug(self, *parts) -> None:
+        """If debug is enabled, add a debug trace."""
+        if self._debug_enabled:
+            print(*parts)
