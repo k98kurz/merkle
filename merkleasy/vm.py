@@ -217,6 +217,7 @@ def hash_to_level(vm: VMProtocol):
     to_level = vm.read(1)[0]
     size = int.from_bytes(vm.read(2), 'big')
     path_bytes = vm.read(size)
+    vm.debug('hash_to_level', 'start', path_bytes.hex())
     path_bits = []
     for i in range(size):
         path_bits.extend([
@@ -232,11 +233,13 @@ def hash_to_level(vm: VMProtocol):
 
     for i in range(from_level, to_level):
         if not path_bits[i]:
-            hash_left(vm)
+            if i != 0:
+                hash_left(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_right(vm)
         else:
-            hash_right(vm)
+            if i != 0:
+                hash_right(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_left(vm)
     hash_left(vm)
@@ -254,6 +257,7 @@ def hash_to_level_hsize(vm: VMProtocol):
     to_level = vm.read(1)[0]
     size = vm.get_register('size')
     path_bytes = vm.read(size)
+    vm.debug('hash_to_level_hsize', 'start', path_bytes.hex(), increment_context=True)
     path_bits = []
     for i in range(size):
         path_bits.extend([
@@ -269,17 +273,20 @@ def hash_to_level_hsize(vm: VMProtocol):
 
     for i in range(from_level, to_level):
         if not path_bits[i]:
-            hash_left(vm)
+            if i != 0:
+                hash_left(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_right(vm)
         else:
-            hash_right(vm)
+            if i != 0:
+                hash_right(vm)
             vm.insert_code(i.to_bytes(1, 'big'))
             load_empty_left(vm)
     hash_left(vm)
     vm.set_register('return', vm.get_register('left'))
     vm.set_register('left', b'')
-    vm.debug('hash_to_level_hsize', vm.get_register('return').hex())
+    vm.debug('hash_to_level_hsize', 'end', vm.get_register('return').hex(),
+             decrement_context=True)
 
 _EMPTY_HASHES = []
 
@@ -366,6 +373,7 @@ class VirtualMachine:
             'return': None,
         }
         self._debug_enabled = debug
+        self._debug_context = 0
 
     def run(self) -> bool:
         """Runs the program. Returns True if the proof was verified
@@ -406,7 +414,22 @@ class VirtualMachine:
         """Returns the value of the specified register."""
         return self.registers[name]
 
-    def debug(self, *parts) -> None:
+    def debug(self, *parts, increment_context: bool = False,
+              decrement_context: bool = False) -> None:
         """If debug is enabled, add a debug trace."""
+        if decrement_context:
+            self._debug_context -= 1
+            if self._debug_context < 0:
+                self._debug_context = 0
+
         if self._debug_enabled:
-            print(*parts)
+            if self._debug_context:
+                print(
+                    ''.join(['\t' for _ in range (self._debug_context)]),
+                    *parts
+                )
+            else:
+                print(*parts)
+
+        if increment_context:
+            self._debug_context += 1
