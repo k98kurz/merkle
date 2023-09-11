@@ -150,6 +150,24 @@ class TestVM(unittest.TestCase):
         hash3 = prover.get_register('return')
         assert hash3 == hash1, f"{hash1.hex()}\n{hash3.hex()}"
 
+    def test_move_to_ops(self):
+        leaf = b'123'
+        program = bytes(vm.OpCodes.load_left) + (3).to_bytes(2, 'big') + leaf
+        program += bytes(vm.OpCodes.hash_leaf_left) + bytes(vm.OpCodes.set_path_auto)
+        program += bytes(vm.OpCodes.hash_to_level_path) + b'\x00\x09'
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        hash1 = prover.get_register('return')
+        assert hash1 != b''
+        assert prover.get_register('left') == b''
+
+        program += bytes(vm.OpCodes.move_to_left)
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        hash2 = prover.get_register('left')
+        assert prover.get_register('return') == b''
+        assert hash2 == hash1
+
 
 if __name__ == '__main__':
     unittest.main()

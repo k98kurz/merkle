@@ -57,6 +57,8 @@ class OpCodes(Enum):
     get_path_bit = 34
     subroutine_left = 40
     subroutine_right = 41
+    move_to_left = 42
+    move_to_right = 43
 
     def __bytes__(self) -> bytes:
         return self.value.to_bytes(1, 'big')
@@ -439,6 +441,8 @@ def hash_to_level_path(vm: VMProtocol):
     right = vm.get_register('right')
     result = left or right
     vm.set_register('return', result)
+    vm.set_register('left', b'')
+    vm.set_register('right', b'')
     vm.debug('hash_to_level_path', 'end', result.hex(), decrement_context=True)
 
 _EMPTY_HASHES = []
@@ -482,6 +486,23 @@ def load_empty_right(vm: VMProtocol):
     vm.set_register('right', hash)
     vm.debug('load_empty_right', hash.hex())
 
+def move_to_left(vm: VMProtocol):
+    """Moves a value from the return register to the left register."""
+    result = vm.get_register('return')
+    left = vm.get_register('left')
+    eruces(left == b'', 'cannot overwrite register')
+    vm.set_register('left', result)
+    vm.set_register('return', b'')
+    vm.debug('move_to_left', result.hex())
+
+def move_to_right(vm: VMProtocol):
+    """Moves a value from the return register to the right register."""
+    result = vm.get_register('return')
+    right = vm.get_register('right')
+    eruces(right == b'', 'cannot overwrite register')
+    vm.set_register('right', result)
+    vm.set_register('return', b'')
+    vm.debug('move_to_right', result.hex())
 
 instruction_set = {
     OpCodes.load_left_hsize: load_left_hsize,
@@ -504,6 +525,10 @@ instruction_set = {
     OpCodes.hash_to_level: hash_to_level,
     OpCodes.hash_to_level_hsize: hash_to_level_hsize,
     OpCodes.hash_to_level_path: hash_to_level_path,
+    OpCodes.subroutine_left: subroutine_left,
+    OpCodes.subroutine_right: subroutine_right,
+    OpCodes.move_to_left: move_to_left,
+    OpCodes.move_to_right: move_to_right,
 }
 
 
