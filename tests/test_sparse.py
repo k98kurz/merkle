@@ -66,6 +66,17 @@ class TestSparseSubTree(unittest.TestCase):
         assert prover.registers['return'] == proof[-1][1:], \
             f"{prover.registers['return'].hex()}\n{proof[-1][1:].hex()}"
 
+    def test_path_returns_list_of_bytes(self):
+       sst = classes.SparseSubTree(leaf=b'123', level=9)
+       path = sst.path()
+       assert type(path) is list
+       assert all([type(item) is bytes for item in path])
+       program = b''.join(path)
+       prover = vm.VirtualMachine(program)
+       assert not prover.run()
+       assert prover.has_completed()
+       assert len(prover.get_errors()) == 0, prover.get_errors()
+
 
 class TestSparseTree(unittest.TestCase):
     @classmethod
@@ -76,8 +87,13 @@ class TestSparseTree(unittest.TestCase):
     def test_from_leaves(self):
         sparse = classes.SparseTree.from_leaves(self.leaves)
         assert isinstance(sparse, classes.SparseTree)
-        print(sparse.treemap)
-        print(sparse.root.hex())
+        assert hasattr(sparse, 'root')
+        assert type(sparse.root) is bytes
+        assert len(sparse.root) == 32
+        assert hasattr(sparse, 'subtrees')
+        assert type(sparse.subtrees) is list
+        for item in sparse.subtrees:
+            assert isinstance(item, classes.SparseSubTree)
 
 
 if __name__ == '__main__':

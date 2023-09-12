@@ -90,6 +90,20 @@ class SparseSubTree:
 
         return proof
 
+    def path(self) -> list[bytes]:
+        """Return a simple/compact Merkle audit path for this sparse
+            subtree using a hash_to_level_ op.
+        """
+        path = [
+            bytes(OpCodes.load_left) + len(self.leaf).to_bytes(2, 'big') +
+            self.leaf
+        ]
+        path.append(bytes(OpCodes.hash_leaf_left))
+        path.append(bytes(OpCodes.set_path_auto))
+        path.append(bytes(OpCodes.hash_to_level_path) + b'\x00' +
+                     self.level.to_bytes(2, 'big'))
+        return path
+
     def root(self) -> bytes:
         """Returns the calculated root."""
         return self.prove()[-1][1:]
