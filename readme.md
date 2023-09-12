@@ -6,6 +6,10 @@ single main class, `merkleasy.Tree`, three error classes, and two configuration
 functions. See the Usage section for details. This uses sha256 as the default
 hash algorithm, but it can use any in theory.
 
+This package uses a virtual machine for proof verification: proofs are created
+in a bytecode form, and the bytecode is then fed through a virtual machine with
+three registers (left, right, and final).
+
 # Status
 
 - [x] Tests
@@ -13,6 +17,7 @@ hash algorithm, but it can use any in theory.
 - [x] Proofs
 - [x] Usage Documentation
 - [x] Publish to pypi
+- [ ] Replace proof verification with register machine
 
 # Installation
 
