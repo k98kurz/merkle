@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .errors import ImplementationError, SecurityError, eruces
 from .interfaces import VMProtocol
 from enum import Enum
@@ -515,6 +516,8 @@ instruction_set = {
     OpCodes.load_right: load_right,
     OpCodes.hash_leaf_left: hash_leaf_left,
     OpCodes.hash_leaf_right: hash_leaf_right,
+    OpCodes.hash_leaf_mid: hash_leaf_mid,
+    OpCodes.hash_leaf_bit: hash_leaf_bit,
     OpCodes.load_empty_left: load_empty_left,
     OpCodes.load_empty_right: load_empty_right,
     OpCodes.hash_final: hash_final,
@@ -557,6 +560,7 @@ class VirtualMachine:
             'final': False,
             'size': 32,
             'return': None,
+            'errors': [],
         }
         self._debug_enabled = debug
         self._debug_context = 0
@@ -585,8 +589,29 @@ class VirtualMachine:
             code = OpCodes(op)
             self.instruction_set[code](self)
             return True
-        except:
+        except BaseException as e:
+            self.registers['errors'].append(e)
             return False
+
+    def reset(self) -> VirtualMachine:
+        """Resets the instance and returns self."""
+        self.pointer = 0
+        self.registers = {
+            'left': b'',
+            'right': b'',
+            'path': b'',
+            'bit': False,
+            'final': False,
+            'size': 32,
+            'return': None,
+            'errors': [],
+        }
+        return self
+
+    def load_program(self, program: bytes = b'', pointer: int = 0) -> None:
+        """Loads the supplied program and resets the instruction pointer."""
+        self.program = program
+        self.pointer = pointer
 
     def insert_code(self, code: bytes) -> None:
         """Inserts code at the current pointer."""
@@ -599,6 +624,16 @@ class VirtualMachine:
     def get_register(self, name: str) -> bytes:
         """Returns the value of the specified register."""
         return self.registers[name]
+
+    def has_completed(self) -> bool:
+        """Returns True if the instruction pointer is >= the length of
+            the loaded program.
+        """
+        return self.pointer >= len(self.program)
+
+    def get_errors(self) -> list[BaseException]:
+        """Returns any errors that occurred during execution."""
+        return self.get_register('errors') or []
 
     def debug(self, *parts, increment_context: bool = False,
               decrement_context: bool = False) -> None:

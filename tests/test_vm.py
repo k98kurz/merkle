@@ -1,4 +1,4 @@
-from context import classes, errors, vm
+from context import classes, errors, vm, interfaces
 from hashlib import sha256, sha3_256
 import unittest
 
@@ -8,6 +8,7 @@ class TestVM(unittest.TestCase):
         self.original_hash_fn = vm.get_hash_function()
         while len(vm._EMPTY_HASHES):
             vm._EMPTY_HASHES.pop()
+        self.root = sha256(b'root').digest()
         return super().setUp()
 
     def tearDown(self) -> None:
@@ -20,6 +21,9 @@ class TestVM(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.leaves = [i.to_bytes(1, 'big') for i in range(10)]
         return super().setUpClass()
+
+    def test_VirtualMachine_implements_VMProtocol(self):
+        assert isinstance(vm.VirtualMachine, interfaces.VMProtocol)
 
     def test_works_with_proofs_from_old_system(self):
         tree = classes.Tree.from_leaves(self.leaves)
@@ -167,6 +171,63 @@ class TestVM(unittest.TestCase):
         hash2 = prover.get_register('left')
         assert prover.get_register('return') == b''
         assert hash2 == hash1
+
+        program = program[:-1] + bytes(vm.OpCodes.move_to_right)
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        hash2 = prover.get_register('right')
+        assert prover.get_register('return') == b''
+        assert hash2 == hash1
+
+    def test_other_hash_ops(self):
+        prover = vm.VirtualMachine(bytes(vm.OpCodes.hash_left))
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        left = prover.get_register('left')
+        assert type(left) is bytes and len(left) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_right))
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        right = prover.get_register('right')
+        assert type(right) is bytes and len(right) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_final_hsize) + self.root)
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        ret = prover.get_register('return')
+        assert type(ret) is bytes and len(ret) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_leaf_left))
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        left = prover.get_register('left')
+        assert type(left) is bytes and len(left) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_leaf_right))
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        right = prover.get_register('right')
+        assert type(right) is bytes and len(right) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_leaf_mid))
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        ret = prover.get_register('return')
+        assert type(ret) is bytes and len(ret) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_leaf_bit))
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        assert prover.get_register('bit') is False
+        left = prover.get_register('left')
+        assert type(left) is bytes and len(left) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_final) + b'\x01' + b'x')
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        ret = prover.get_register('return')
+        assert type(ret) is bytes and len(ret) == 32
 
 
 if __name__ == '__main__':

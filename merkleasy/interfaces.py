@@ -25,6 +25,14 @@ class VMProtocol(Protocol):
         """
         ...
 
+    def reset(self) -> VMProtocol:
+        """Resets the virtual machine and returns self."""
+        ...
+
+    def load_program(self, program: bytes = b'', pointer: int = 0) -> None:
+        """Loads the supplied program and resets the instruction pointer."""
+        ...
+
     def insert_code(self, code: bytes) -> None:
         """Inserts code at the current pointer."""
         ...
@@ -35,6 +43,14 @@ class VMProtocol(Protocol):
 
     def get_register(self, name: Hashable) -> Any:
         """Returns the value of the specified register."""
+        ...
+
+    def has_completed(self) -> bool:
+        """Returns True if the VM has completed running the program."""
+        ...
+
+    def get_errors(self) -> list[BaseException]:
+        """Returns any errors that occurred during execution."""
         ...
 
     def debug(self, *parts, increment_context: bool = False,
