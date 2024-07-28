@@ -157,7 +157,7 @@ class SparseTree:
         subtrees: list[SparseSubTree] = [
             SparseSubTree(leaf, lhf * 8) for leaf in leaves
         ]
-        intersections = []
+        intersections: list[tuple[int,int,int],] = []
 
         for i in range(len(subtrees)):
             for j in range(len(subtrees)):
@@ -168,7 +168,7 @@ class SparseTree:
 
         intersections.sort(key=lambda i: i[2])
 
-        treemap = {}
+        treemap: dict[int, list[int, SparseSubTree]] = {}
         for nt in intersections:
             i, j, level = nt
             if level < subtrees[i].level:
