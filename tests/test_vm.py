@@ -107,7 +107,17 @@ class TestVM(unittest.TestCase):
         vm.compute_empty_hashes()
         assert max_hash != vm._EMPTY_HASHES[-1]
 
-    def test_load_empty_ops(self):
+    def test_load_ops_and_hash_final_hszie(self):
+        program = bytes(vm.OpCodes.load_left) + (2).to_bytes(2, 'big') + b'1234'
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        assert prover.get_register('left') == b'12'
+
+        program = bytes(vm.OpCodes.load_right) + (3).to_bytes(2, 'big') + b'1234'
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        assert prover.get_register('right') == b'123'
+
         program = bytes(vm.OpCodes.load_empty_left)
         program += (0).to_bytes(1, 'big')
         program += bytes(vm.OpCodes.load_empty_right)
@@ -124,6 +134,16 @@ class TestVM(unittest.TestCase):
         program += root
         prover = vm.VirtualMachine(program)
         assert prover.run()
+
+        prover = vm.VirtualMachine(bytes(vm.OpCodes.load_left_hsize) + b'123')
+        prover.set_register('size', 2)
+        assert not prover.run()
+        assert prover.get_register('left') == b'12'
+
+        prover = vm.VirtualMachine(bytes(vm.OpCodes.load_right_hsize) + b'123')
+        prover.set_register('size', 3)
+        assert not prover.run()
+        assert prover.get_register('right') == b'123'
 
     def test_hash_to_level_ops(self):
         leaf = b'123'
@@ -154,30 +174,14 @@ class TestVM(unittest.TestCase):
         hash3 = prover.get_register('return')
         assert hash3 == hash1, f"{hash1.hex()}\n{hash3.hex()}"
 
-    def test_move_to_ops(self):
-        leaf = b'123'
+        # using hash_to_level
         program = bytes(vm.OpCodes.load_left) + (3).to_bytes(2, 'big') + leaf
-        program += bytes(vm.OpCodes.hash_leaf_left) + bytes(vm.OpCodes.set_path_auto)
-        program += bytes(vm.OpCodes.hash_to_level_path) + b'\x00\x09'
-        prover = vm.VirtualMachine(program)
+        program += bytes(vm.OpCodes.hash_leaf_left)
+        program += bytes(vm.OpCodes.hash_to_level) + b'\x00\x09' + \
+            (32).to_bytes(2, 'big') + leaf_hash
         prover.run()
-        hash1 = prover.get_register('return')
-        assert hash1 != b''
-        assert prover.get_register('left') == b''
-
-        program += bytes(vm.OpCodes.move_to_left)
-        prover = vm.VirtualMachine(program)
-        prover.run()
-        hash2 = prover.get_register('left')
-        assert prover.get_register('return') == b''
-        assert hash2 == hash1
-
-        program = program[:-1] + bytes(vm.OpCodes.move_to_right)
-        prover = vm.VirtualMachine(program)
-        prover.run()
-        hash2 = prover.get_register('right')
-        assert prover.get_register('return') == b''
-        assert hash2 == hash1
+        hash4 = prover.get_register('return')
+        assert hash4 == hash1, f"{hash1.hex()}\n{hash4.hex()}"
 
     def test_other_hash_ops(self):
         prover = vm.VirtualMachine(bytes(vm.OpCodes.hash_left))
@@ -193,6 +197,14 @@ class TestVM(unittest.TestCase):
         assert type(right) is bytes and len(right) == 32
 
         prover.reset().load_program(bytes(vm.OpCodes.hash_final_hsize) + self.root)
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        ret = prover.get_register('return')
+        assert type(ret) is bytes and len(ret) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_mid))
+        prover.set_register('left', b'1')
+        prover.set_register('right', b'2')
         assert not prover.run()
         assert len(prover.get_errors()) == 0
         ret = prover.get_register('return')
@@ -223,11 +235,129 @@ class TestVM(unittest.TestCase):
         left = prover.get_register('left')
         assert type(left) is bytes and len(left) == 32
 
+        prover.reset().load_program(bytes(vm.OpCodes.hash_bit))
+        prover.set_register('left', b'1')
+        prover.set_register('right', b'2')
+        prover.set_register('bit', True)
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        ret = prover.get_register('right')
+        assert type(ret) is bytes and len(ret) == 32
+        prover.reset().load_program(bytes(vm.OpCodes.hash_bit))
+        prover.set_register('left', b'1')
+        prover.set_register('right', b'2')
+        prover.set_register('bit', False)
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0
+        assert ret == prover.get_register('left')
+
         prover.reset().load_program(bytes(vm.OpCodes.hash_final) + b'\x01' + b'x')
         assert not prover.run()
         assert len(prover.get_errors()) == 0
         ret = prover.get_register('return')
         assert type(ret) is bytes and len(ret) == 32
+
+        prover.reset().load_program(bytes(vm.OpCodes.hash_with_empty) + b'\x02')
+        prover.set_register('left', b'1')
+        prover.set_register('bit', False)
+        assert not prover.run()
+        assert len(prover.get_errors()) == 0, prover.get_errors()
+        ret = prover.get_register('left')
+        assert type(ret) is bytes and len(ret) == 32
+
+    def test_set_ops(self):
+        prover = vm.VirtualMachine(bytes(vm.OpCodes.set_hsize) + (69).to_bytes(1, 'big'))
+        assert not prover.run()
+        assert prover.get_register('size') == 69
+
+        program = bytes(vm.OpCodes.set_path) + (2).to_bytes(2, 'big') + b'12'
+        prover.reset().load_program(program)
+        assert not prover.run()
+        assert prover.get_register('path') == b'12'
+
+        program = bytes(vm.OpCodes.set_path_hsize) + b'12'
+        prover.reset().load_program(program)
+        prover.set_register('size', 2)
+        assert not prover.run()
+        assert prover.get_register('path') == b'12'
+
+        program = bytes(vm.OpCodes.set_path_auto)
+        prover.reset().load_program(program)
+        prover.set_register('left', b'321')
+        prover.set_register('right', b'abc')
+        assert not prover.run()
+        assert prover.get_register('path') == b'321'
+        prover.reset().load_program(program)
+        prover.set_register('right', b'abc')
+        assert not prover.run()
+        assert prover.get_register('path') == b'abc'
+
+    def test_other_ops(self):
+        prover = vm.VirtualMachine()
+        program = bytes(vm.OpCodes.get_path_bit) + b'\x01'
+        prover.reset().load_program(program)
+        prover.set_register('path', (0b01000000).to_bytes(1, 'big'))
+        prover.run()
+        assert prover.get_register('bit')
+        prover.reset().load_program(program)
+        prover.set_register('path', (0b10000000).to_bytes(1, 'big'))
+        prover.run()
+        assert not prover.get_register('bit')
+
+        leaf = b'123'
+        leaf = sha256(b'\x00' + leaf).digest()
+        root = sha256(b'\x01' + leaf).digest()
+        subprogram = bytes(vm.OpCodes.load_left) + len(leaf).to_bytes(2, 'big')
+        subprogram += leaf + bytes(vm.OpCodes.hash_final) + b'\x20' + root
+
+        program = bytes(vm.OpCodes.subroutine_left) + b'\x00'
+        prover.reset().load_program(program)
+        assert not prover.run()
+        assert len(prover.get_errors()) > 0
+        program = bytes(vm.OpCodes.subroutine_left)
+        program += len(subprogram).to_bytes(2, 'big') + subprogram
+        prover.reset().load_program(program)
+        prover.run()
+        assert prover.get_register('left')
+        assert not prover.get_register('right')
+        assert len(prover.get_errors()) == 0
+
+        program = bytes(vm.OpCodes.subroutine_right) + b'\x00'
+        prover.reset().load_program(program)
+        assert not prover.run()
+        assert len(prover.get_errors()) > 0
+        program = bytes(vm.OpCodes.subroutine_right)
+        program += len(subprogram).to_bytes(2, 'big') + subprogram
+        prover.reset().load_program(program)
+        prover.run()
+        assert not prover.get_register('left')
+        assert prover.get_register('right')
+        assert len(prover.get_errors()) == 0
+
+    def test_move_to_ops(self):
+        leaf = b'123'
+        program = bytes(vm.OpCodes.load_left) + (3).to_bytes(2, 'big') + leaf
+        program += bytes(vm.OpCodes.hash_leaf_left) + bytes(vm.OpCodes.set_path_auto)
+        program += bytes(vm.OpCodes.hash_to_level_path) + b'\x00\x09'
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        hash1 = prover.get_register('return')
+        assert hash1 != b''
+        assert prover.get_register('left') == b''
+
+        program += bytes(vm.OpCodes.move_to_left)
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        hash2 = prover.get_register('left')
+        assert prover.get_register('return') == b''
+        assert hash2 == hash1
+
+        program = program[:-1] + bytes(vm.OpCodes.move_to_right)
+        prover = vm.VirtualMachine(program)
+        prover.run()
+        hash2 = prover.get_register('right')
+        assert prover.get_register('return') == b''
+        assert hash2 == hash1
 
 
 if __name__ == '__main__':

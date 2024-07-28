@@ -43,8 +43,8 @@ class OpCodes(Enum):
     hash_leaf_bit = 9
     hash_bit = 10
     hash_final = 11
-    hash_to_level = 12
-    hash_with_empty = 13
+    hash_with_empty = 12
+    hash_to_level = 13
     hash_to_level_hsize = 14
     hash_to_level_path = 15
     load_left = 20
@@ -234,6 +234,9 @@ def subroutine_left(vm: VMProtocol):
     """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
         the subroutine in a new VM. Subroutine must end with successful
         final_hash, then that hash will be put in the left register.
+        Raises SecurityError if the subroutine did not execute
+        successfully; or if the VM left register is set and the
+        subroutine final register is set to something different.
     """
     size = int.from_bytes(vm.read(2), 'big')
     subroutine = vm.read(size)
@@ -250,7 +253,10 @@ def subroutine_left(vm: VMProtocol):
 def subroutine_right(vm: VMProtocol):
     """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
         the subroutine in a new VM. Subroutine must end with successful
-        final_hash, then that hash will be put in the right register.
+        final_hash, then that hash will be put in the right register
+        Raises SecurityError if the subroutine did not execute
+        successfully; or if the VM right register is set and the
+        subroutine final register is set to something different.
     """
     size = int.from_bytes(vm.read(2), 'big')
     subroutine = vm.read(size)
@@ -296,7 +302,7 @@ def set_path_auto(vm: VMProtocol):
 
 def get_path_bit(vm: VMProtocol):
     """Read next byte as uint8 index. Get the bit at the index from the
-        byte_path register and put into bit register.
+        path register and put into bit register.
     """
     index = vm.read(1)[0]
     path = vm.get_register('path')
@@ -399,7 +405,7 @@ def hash_to_level_hsize(vm: VMProtocol):
              decrement_context=True)
 
 def hash_with_empty(vm: VMProtocol):
-    """Read next byte as uint8 index. Read bit register. Load the
+    """Read next byte as uint8 index. Read bit register. Load indexth
         recursively hashed empty node into the empty register (left or
         right), then hash_node and put the result in the register
         indicated by bit.
@@ -511,23 +517,26 @@ instruction_set = {
     OpCodes.hash_left: hash_left,
     OpCodes.hash_right: hash_right,
     OpCodes.hash_final_hsize: hash_final_hsize,
-    OpCodes.set_hsize: set_hsize,
-    OpCodes.load_left: load_left,
-    OpCodes.load_right: load_right,
+    OpCodes.hash_mid: hash_mid,
     OpCodes.hash_leaf_left: hash_leaf_left,
     OpCodes.hash_leaf_right: hash_leaf_right,
     OpCodes.hash_leaf_mid: hash_leaf_mid,
     OpCodes.hash_leaf_bit: hash_leaf_bit,
+    OpCodes.hash_bit: hash_bit,
+    OpCodes.hash_final: hash_final,
+    OpCodes.hash_with_empty: hash_with_empty,
+    OpCodes.hash_to_level: hash_to_level,
+    OpCodes.hash_to_level_hsize: hash_to_level_hsize,
+    OpCodes.hash_to_level_path: hash_to_level_path,
+    OpCodes.load_left: load_left,
+    OpCodes.load_right: load_right,
     OpCodes.load_empty_left: load_empty_left,
     OpCodes.load_empty_right: load_empty_right,
-    OpCodes.hash_final: hash_final,
+    OpCodes.set_hsize: set_hsize,
     OpCodes.set_path: set_path,
     OpCodes.set_path_hsize: set_path_hsize,
     OpCodes.set_path_auto: set_path_auto,
     OpCodes.get_path_bit: get_path_bit,
-    OpCodes.hash_to_level: hash_to_level,
-    OpCodes.hash_to_level_hsize: hash_to_level_hsize,
-    OpCodes.hash_to_level_path: hash_to_level_path,
     OpCodes.subroutine_left: subroutine_left,
     OpCodes.subroutine_right: subroutine_right,
     OpCodes.move_to_left: move_to_left,
@@ -617,11 +626,11 @@ class VirtualMachine:
         """Inserts code at the current pointer."""
         self.program = self.program[:self.pointer] + code + self.program[self.pointer:]
 
-    def set_register(self, name: str, value: bytes) -> None:
+    def set_register(self, name: str, value: bytes|int|bool|None) -> None:
         """Sets the specified register to the given value."""
         self.registers[name] = value
 
-    def get_register(self, name: str) -> bytes:
+    def get_register(self, name: str) -> bytes|int|bool|None:
         """Returns the value of the specified register."""
         return self.registers[name]
 
