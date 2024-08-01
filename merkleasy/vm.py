@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .errors import ImplementationError, SecurityError, eruces
+from .errors import ImplementationError, SecurityError, eruces, yert, tert
 from .interfaces import VMProtocol
 from enum import Enum
 from hashlib import sha256
@@ -29,6 +29,14 @@ def hash_leaf(data: bytes) -> bytes:
 def hash_node(left: bytes, right: bytes) -> bytes:
     return get_hash_function()(b'\x01' + left + right)
 
+def xor(b1: bytes, b2: bytes) -> bytes:
+    """XOR two equal-length byte strings together."""
+    b3 = bytearray()
+    for i in range(len(b1)):
+        b3.append(b1[i] ^ b2[i])
+
+    return bytes(b3)
+
 
 class OpCodes(Enum):
     load_left_hsize = 0
@@ -47,19 +55,24 @@ class OpCodes(Enum):
     hash_to_level = 13
     hash_to_level_hsize = 14
     hash_to_level_path = 15
-    load_left = 20
-    load_right = 21
-    load_empty_left = 22
-    load_empty_right = 23
-    set_hsize = 30
-    set_path = 31
-    set_path_hsize = 32
-    set_path_auto = 33
-    get_path_bit = 34
-    subroutine_left = 40
-    subroutine_right = 41
-    move_to_left = 42
-    move_to_right = 43
+    hash_left_only = 16
+    hash_right_only = 17
+    hash_xor_left = 18
+    hash_xor_right = 19
+    hash_xor_final = 20
+    load_left = 30
+    load_right = 31
+    load_empty_left = 32
+    load_empty_right = 33
+    set_hsize = 40
+    set_path = 41
+    set_path_hsize = 42
+    set_path_auto = 43
+    get_path_bit = 44
+    subroutine_left = 50
+    subroutine_right = 51
+    move_to_left = 52
+    move_to_right = 53
 
     def __bytes__(self) -> bytes:
         return self.value.to_bytes(1, 'big')
@@ -228,7 +241,62 @@ def hash_final(vm: VMProtocol):
     observed_root = hash_node(left, right)
     vm.set_register('final', observed_root == expected_root)
     vm.set_register('return', observed_root)
-    vm.debug('hash_final', observed_root.hex())
+    vm.debug('hash_final', observed_root.hex(), expected_root.hex())
+
+def hash_left_only(vm: VMProtocol):
+    """Puts hash(left) into the left register."""
+    left = vm.get_register('left')
+    left = get_hash_function()(left)
+    vm.set_register('left', left)
+    vm.debug('hash_left_only', left.hex())
+
+def hash_right_only(vm: VMProtocol):
+    """Puts hash(right) into the right register."""
+    right = vm.get_register('right')
+    right = get_hash_function()(right)
+    vm.set_register('right', right)
+    vm.debug('hash_right_only', right.hex())
+
+def hash_xor_left(vm: VMProtocol):
+    """Puts xor(hash(left), hash(right)) into the left register. Clears
+        the right register.
+    """
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    left = get_hash_function()(left)
+    right = get_hash_function()(right)
+    left = xor(left, right)
+    vm.set_register('left', left)
+    vm.set_register('right', b'')
+    vm.debug('hash_xor_left', left)
+
+def hash_xor_left(vm: VMProtocol):
+    """Puts xor(hash(left), hash(right)) into the right register. Clears
+        the left register.
+    """
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    left = get_hash_function()(left)
+    right = get_hash_function()(right)
+    right = xor(left, right)
+    vm.set_register('left', b'')
+    vm.set_register('right', right)
+    vm.debug('hash_xor_left', right)
+
+def hash_xor_final(vm: VMProtocol):
+    """Reads next byte, interpreting as an int. Read that many bytes as
+        root hash. Calculates xor(hash(left), hash(right)). Puts True in
+        final register if they match and False otherwise. Puts the
+        calculated final hash in the return register.
+    """
+    size = vm.read(1)[0]
+    expected_root = vm.read(size)
+    left = vm.get_register('left')
+    right = vm.get_register('right')
+    observed_root = xor(get_hash_function()(left), get_hash_function()(right))
+    vm.set_register('final', observed_root == expected_root)
+    vm.set_register('return', observed_root)
+    vm.debug('hash_final', observed_root.hex(), expected_root.hex())
 
 def subroutine_left(vm: VMProtocol):
     """Read 2 bytes as uint16. Read that many bytes as subroutine. Run
@@ -544,6 +612,78 @@ instruction_set = {
 }
 
 
+def compile(*symbols: OpCodes|bytes|int) -> bytes:
+    """Compiles a list of OpCodes, bytes, and ints into byte code.
+        Raises SyntaxError for invalid VM code syntax. Raises TypeError
+        for invalid symbols.
+    """
+    for symbol, index in zip(symbols, range(len(symbols))):
+        tert(type(symbol) in (OpCodes, bytes, int),
+            f"Symbol at {index}: type {type(symbol)} not supported")
+
+    index = 0
+    code = b''
+    while index < len(symbols):
+        to_add, advance = _compile_next(symbols[index:])
+        code += to_add
+        index += advance
+
+_advance_ = {
+    'op bytes': (
+        OpCodes.load_left_hsize,
+        OpCodes.load_right_hsize,
+        OpCodes.hash_final_hsize,
+    ),
+    'op byte': (
+        OpCodes.set_hsize,
+    ),
+    'op u16 bytes': (
+        OpCodes.load_left,
+        OpCodes.load_right,
+    )
+}
+
+def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, int]:
+    """Compiles the next op into byte code using remaining symbols.
+        Returns the byte code and the number of symbols to advance.
+        Raises SyntaxError if the symbol at the index is not an OpCode.
+    """
+    yert(type(symbols[index]) is OpCodes,
+        f"Symbol at {index}: expected OpCodes element.")
+
+    op = OpCodes[symbols[index]]
+    code = bytes(op)
+
+    if op in _advance_['op bytes']:
+        yert(type(symbols[index+1]) is bytes,
+             f"Symbol at {index+1} (after {op.name}): expected bytes; " +
+             f"{type(symbols[index+1])} not supported")
+        code += symbols[index+1]
+        return (code, 2)
+
+    if op in _advance_['op byte']:
+        yert(type(symbols[index+1]) is bytes,
+             f"Symbol at {index+1} (after {op.name}): expected 1 byte; " +
+             f"{type(symbols[index+1])} not supported")
+        yert(type(symbols[index+1]) is bytes and len(symbols[index+1]) == 1,
+             f"Symbol at {index+1} (after {op.name}): expected 1 byte; " +
+             f"{symbols[index+1].hex()} has invalid length")
+        code += symbols[index+1]
+        return (code, 2)
+
+    if op in _advance_['op u16 bytes']:
+        yert(type(symbols[index+1]) is bytes,
+             f"Symbol at {index+1} (after {op.name}): expected bytes "+
+             f"up to 2^16-1 length; {type(symbols[index+1])} is not supported")
+        yert(len(symbols[index+1]) < 2**16,
+             f"Symbol at {index+1} (after {op.name}): expected bytes "+
+             f"up to 2^16-1 length; {len(symbols[index+1])} is too large")
+        code += len(symbols[index+1]).to_bytes(2, 'big')
+        code += symbols[index+1]
+        return (code, 2)
+
+    return (code, 1)
+
 def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
     return OpCodes.set_hsize.value.to_bytes(1, 'big') + \
         (hash_size).to_bytes(1, 'big') + b''.join(proof)
@@ -553,7 +693,7 @@ class VirtualMachine:
     program: bytes
     pointer: int
     instruction_set: dict
-    registers: dict
+    registers: dict[str, bytes|bool|int|None|list]
 
     def __init__(self, program: bytes = b'', pointer: int = 0,
                  instruction_set: dict[OpCodes, Callable] = instruction_set,

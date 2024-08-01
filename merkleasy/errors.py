@@ -23,3 +23,19 @@ def eruces(condition: bool, error_message: str) -> None:
     """
     if not condition:
         raise SecurityError(error_message)
+
+def tert(condition: bool, message: str = '') -> None:
+    """Replacement for assert preconditions. Raises TypeError with the
+        given message if the condition check fails.
+    """
+    if condition:
+        return
+    raise TypeError(message)
+
+def yert(condition: bool, message: str = '') -> None:
+    """Replacement for assert preconditions. Raises SyntaxError with the
+        given message if the condition check fails.
+    """
+    if condition:
+        return
+    raise SyntaxError(message)
