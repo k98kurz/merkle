@@ -17,14 +17,6 @@ from typing import Optional
 import json
 
 
-class ProofOp(Enum):
-    load_left = b'\x00'
-    load_right = b'\x01'
-    hash_left = b'\x02'
-    hash_right = b'\x03'
-    hash_final = b'\x04'
-
-
 class Tree:
     _root: bytes
     _parent: Optional[Tree]
@@ -177,24 +169,24 @@ class Tree:
         for direction in history:
             if direction == -1:
                 # left element
-                proof.append(ProofOp.hash_left.value)
+                proof.append(bytes(OpCodes.hash_left))
                 if first or verbose:
-                    proof.append(ProofOp.load_left.value + node[0])
+                    proof.append(bytes(OpCodes.load_left_hsize) + node[0])
                     first = False
-                proof.append(ProofOp.load_right.value + node[1].right_bytes)
+                proof.append(bytes(OpCodes.load_right_hsize) + node[1].right_bytes)
             else:
                 # right element
-                proof.append(ProofOp.hash_right.value)
+                proof.append(bytes(OpCodes.hash_right))
                 if first or verbose:
-                    proof.append(ProofOp.load_right.value + node[0])
+                    proof.append(bytes(OpCodes.load_right_hsize) + node[0])
                     first = False
-                proof.append(ProofOp.load_left.value + node[1].left_bytes)
+                proof.append(bytes(OpCodes.load_left_hsize) + node[1].left_bytes)
 
             # advance
             if node[1] is not self:
                 new_node = node[1]
                 node = [n for n in nodes if n[0] == new_node.root][0]
-        proof = [*proof[1:], ProofOp.hash_final.value + self.root]
+        proof = [*proof[1:], bytes(OpCodes.hash_final_hsize) + self.root]
 
         return proof
 
@@ -259,28 +251,3 @@ def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> l
         nodes.extend(_traverse(branch.right, (*history, 1)))
 
     return nodes
-
-def _run_verification_step(step: tuple[ProofOp, Optional[bytes]], data: dict) -> None:
-    """Runs an individual verification step. Raises SecurityError on
-        failure; changes data as necessary.
-    """
-    match step[0]:
-        case ProofOp.load_left:
-            if data['left']:
-                eruces(data['left'] == step[1],
-                    'generated hash does not match next step in proof')
-            data['left'] = step[1]
-        case ProofOp.load_right:
-            if data['right']:
-                eruces(data['right'] == step[1], \
-                    'generated hash does not match next step in proof')
-            data['right'] = step[1]
-        case ProofOp.hash_left:
-            data['left'] = get_hash_function()(b'\x01' + data['left'] + data['right'])
-            data['right'] = None
-        case ProofOp.hash_right:
-            data['right'] = get_hash_function()(b'\x01' + data['left'] + data['right'])
-            data['left'] = None
-        case ProofOp.hash_final:
-            result = get_hash_function()(b'\x01' + data['left'] + data['right'])
-            eruces(result == step[1], 'final hash does not match')
