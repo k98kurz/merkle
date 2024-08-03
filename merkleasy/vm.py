@@ -229,7 +229,7 @@ def hash_bit(vm: VMProtocol):
     vm.debug('hash_bit', bit, result.hex())
 
 def hash_final(vm: VMProtocol):
-    """Reads next byte, interpreting as an int. Read that many bytes as
+    """Reads next byte, interpreting as uint8. Read that many bytes as
         root hash. Calculates hash(0x01 | left | right). Puts True in
         final register if they match and False otherwise. Puts the
         calculated final hash in the return register.
@@ -270,7 +270,7 @@ def hash_xor_left(vm: VMProtocol):
     vm.set_register('right', b'')
     vm.debug('hash_xor_left', left)
 
-def hash_xor_left(vm: VMProtocol):
+def hash_xor_right(vm: VMProtocol):
     """Puts xor(hash(left), hash(right)) into the right register. Clears
         the left register.
     """
@@ -284,7 +284,7 @@ def hash_xor_left(vm: VMProtocol):
     vm.debug('hash_xor_left', right)
 
 def hash_xor_final(vm: VMProtocol):
-    """Reads next byte, interpreting as an int. Read that many bytes as
+    """Reads next byte, interpreting as uint8. Read that many bytes as
         root hash. Calculates xor(hash(left), hash(right)). Puts True in
         final register if they match and False otherwise. Puts the
         calculated final hash in the return register.
@@ -370,7 +370,7 @@ def set_path_auto(vm: VMProtocol):
 
 def get_path_bit(vm: VMProtocol):
     """Read next byte as uint8 index. Get the bit at the index from the
-        path register and put into bit register.
+        path register and put into the bit register.
     """
     index = vm.read(1)[0]
     path = vm.get_register('path')
@@ -536,9 +536,9 @@ def get_empty_hash(level: int) -> bytes:
     return _EMPTY_HASHES[level]
 
 def load_empty_left(vm: VMProtocol):
-    """Reads the next byte, interpreting as uint8. Loads the recursively
-        hashed empty leaf for that level of the Sparse Merkle Tree into
-        the left register.
+    """Reads the next byte, interpreting as uint8 level. Loads the
+        recursively hashed empty leaf for that level of the Sparse
+        Merkle Tree into the left register.
     """
     level = vm.read(1)[0]
     hash = get_empty_hash(level)
@@ -549,9 +549,9 @@ def load_empty_left(vm: VMProtocol):
     vm.debug('load_empty_left', hash.hex())
 
 def load_empty_right(vm: VMProtocol):
-    """Reads the next byte, interpreting as uint8. Loads the recursively
-        hashed empty leaf for that level of the Sparse Merkle Tree into
-        the right register.
+    """Reads the next byte, interpreting as uint8 level. Loads the
+        recursively hashed empty leaf for that level of the Sparse
+        Merkle Tree into the right register.
     """
     level = vm.read(1)[0]
     hash = get_empty_hash(level)
@@ -629,57 +629,156 @@ def compile(*symbols: OpCodes|bytes|int) -> bytes:
         index += advance
 
 _advance_ = {
+    'op': (
+        OpCodes.hash_mid,
+        OpCodes.hash_left,
+        OpCodes.hash_right,
+        OpCodes.hash_leaf_left,
+        OpCodes.hash_leaf_right,
+        OpCodes.hash_leaf_mid,
+        OpCodes.hash_leaf_bit,
+        OpCodes.hash_bit,
+        OpCodes.hash_left_only,
+        OpCodes.hash_right_only,
+        OpCodes.hash_xor_left,
+        OpCodes.hash_xor_right,
+        OpCodes.set_path_auto,
+    ),
     'op bytes': (
         OpCodes.load_left_hsize,
         OpCodes.load_right_hsize,
         OpCodes.hash_final_hsize,
+        OpCodes.set_path_hsize,
     ),
-    'op byte': (
-        OpCodes.set_hsize,
+    'op u8 bytes': (
+        OpCodes.hash_final,
+        OpCodes.hash_xor_final,
     ),
     'op u16 bytes': (
         OpCodes.load_left,
         OpCodes.load_right,
+        OpCodes.subroutine_left,
+        OpCodes.subroutine_right,
+        OpCodes.set_path,
+    ),
+    'op u8 u8 u16 bytes': (
+        OpCodes.hash_to_level,
+    ),
+    'op u8 u8 bytes': (
+        OpCodes.hash_to_level_hsize,
+    ),
+    'op u8': (
+        OpCodes.set_hsize,
+        OpCodes.get_path_bit,
+        OpCodes.hash_with_empty,
+        OpCodes.load_empty_left,
+        OpCodes.load_empty_right,
+    ),
+    'op u8 u8': (
+        OpCodes.hash_to_level_path,
     )
 }
 
 def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, int]:
     """Compiles the next op into byte code using remaining symbols.
         Returns the byte code and the number of symbols to advance.
-        Raises SyntaxError if the symbol at the index is not an OpCode.
+        Raises SyntaxError if the symbol at the index is not an OpCode
+        or if the symbols did not contain valid parameters for the
+        OpCode.
     """
     yert(type(symbols[index]) is OpCodes,
         f"Symbol at {index}: expected OpCodes element.")
+
+    def check_param_count(symbols: list[OpCodes|bytes|int], index: int, count: int, params: str):
+        yert(len(symbols[index:]) >= count,
+             f"Symbol at {index}: expected {'params' if count>1 else 'param'} {params}")
+
+    def check_u8(symbols: list[OpCodes|bytes|int], index: int, offset: int):
+        yert(type(symbols[index+offset]) is int,
+             f"Symbol at {index+offset} (after {op.name}): expected int; " +
+             f"{type(symbols[index+offset])} not supported")
+        yert(0 <= symbols[index+offset] < 256,
+             f"Symbol at {index+offset} (after {op.name}): " +
+             f"expected 0<={symbols[index+offset]}<=255")
+
+    def check_bytes_255(symbols: list[OpCodes|bytes|int], index: int, offset: int):
+        yert(type(symbols[index+offset]) is bytes,
+             f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +
+             f"{symbols[index+offset]}): expected bytes up to 255 length; " +
+             f"{type(symbols[index+offset])} is not supported")
+        yert(len(symbols[index+offset]) < 256,
+             f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +
+             f"{symbols[index+offset]}): expected bytes up to 255 length; " +
+             f"{len(symbols[index+offset])} is too large")
+
+    def check_bytes_65535(symbols: list[OpCodes|bytes|int], index: int, offset: int):
+        yert(type(symbols[index+offset]) is bytes,
+             f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +
+             f"{symbols[index+offset]}): expected bytes up to 65535 length; " +
+             f"{type(symbols[index+offset])} is not supported")
+        yert(len(symbols[index+offset]) < 2**16,
+             f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +
+             f"{symbols[index+offset]}): expected bytes up to 65535 length; " +
+             f"{len(symbols[index+offset])} is too large")
 
     op = OpCodes[symbols[index]]
     code = bytes(op)
 
     if op in _advance_['op bytes']:
-        yert(type(symbols[index+1]) is bytes,
-             f"Symbol at {index+1} (after {op.name}): expected bytes; " +
-             f"{type(symbols[index+1])} not supported")
+        check_param_count(symbols, index, 1, "bytes")
+        check_bytes_65535(symbols, index, 1)
         code += symbols[index+1]
         return (code, 2)
 
-    if op in _advance_['op byte']:
-        yert(type(symbols[index+1]) is bytes,
-             f"Symbol at {index+1} (after {op.name}): expected 1 byte; " +
-             f"{type(symbols[index+1])} not supported")
-        yert(type(symbols[index+1]) is bytes and len(symbols[index+1]) == 1,
-             f"Symbol at {index+1} (after {op.name}): expected 1 byte; " +
-             f"{symbols[index+1].hex()} has invalid length")
+    if op in _advance_['op u8 bytes']:
+        check_param_count(symbols, index, 1, "bytes(len<=255)")
+        check_bytes_255(symbols, index, 1)
+        code += len(symbols[index+1]).to_bytes(1, 'big')
         code += symbols[index+1]
         return (code, 2)
 
     if op in _advance_['op u16 bytes']:
-        yert(type(symbols[index+1]) is bytes,
-             f"Symbol at {index+1} (after {op.name}): expected bytes "+
-             f"up to 2^16-1 length; {type(symbols[index+1])} is not supported")
-        yert(len(symbols[index+1]) < 2**16,
-             f"Symbol at {index+1} (after {op.name}): expected bytes "+
-             f"up to 2^16-1 length; {len(symbols[index+1])} is too large")
+        check_param_count(symbols, index, 1, "bytes(len<=65535)")
+        check_bytes_65535(symbols, index, 1)
         code += len(symbols[index+1]).to_bytes(2, 'big')
         code += symbols[index+1]
+        return (code, 2)
+
+    if op in _advance_['op u8 u8 u16 bytes']:
+        check_param_count(symbols, index, 3, "uint8 uint8 bytes(len<=65535)")
+        yert(len(symbols[index:]) >= 3,
+             f"Symbol at {index}: expected params uint8 uint8 bytes(len<=65535)")
+        check_u8(symbols, index, 1)
+        check_u8(symbols, index, 2)
+        check_bytes_65535(symbols, index, 3)
+        code += symbols[index+1].to_bytes(1, 'big')
+        code += symbols[index+2].to_bytes(1, 'big')
+        code += len(symbols[index+3]).to_bytes(2, 'big')
+        code += symbols[index+3]
+        return (code, 4)
+
+    if op in _advance_['op u8 u8 bytes']:
+        check_param_count(symbols, index, 3, "uint8 uint8 bytes(len<=65535)")
+        check_u8(symbols, index, 1)
+        check_u8(symbols, index, 2)
+        check_bytes_65535(symbols, index, 3)
+        code += symbols[index+1].to_bytes(1, 'big')
+        code += symbols[index+2].to_bytes(1, 'big')
+        code += symbols[index+3]
+        return (code, 4)
+
+    if op in _advance_['op u8 u8']:
+        check_param_count(symbols, index, 2, "uint8 uint8")
+        check_u8(symbols, index, 1)
+        check_u8(symbols, index, 2)
+        code += symbols[index+1].to_bytes(1, 'big')
+        code += symbols[index+2].to_bytes(1, 'big')
+        return (code, 3)
+
+    if op in _advance_['op u8']:
+        check_param_count(symbols, index, 1, "uint8")
+        check_u8(symbols, index, 1)
+        code += symbols[index+1].to_bytes(1, 'big')
         return (code, 2)
 
     return (code, 1)
