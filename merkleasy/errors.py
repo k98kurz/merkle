@@ -32,6 +32,14 @@ def tert(condition: bool, message: str = '') -> None:
         return
     raise TypeError(message)
 
+def vert(condition: bool, message: str = '') -> None:
+    """Replacement for assert preconditions. Raises ValueError with the
+        given message if the condition check fails.
+    """
+    if condition:
+        return
+    raise ValueError(message)
+
 def yert(condition: bool, message: str = '') -> None:
     """Replacement for assert preconditions. Raises SyntaxError with the
         given message if the condition check fails.

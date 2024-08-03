@@ -909,5 +909,8 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, 
 
 
 def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
+    """Adapts a proof from the legacy code into bytecode."""
+    tert(all([type(step) is bytes for step in proof]),
+           'proof must be bytes or list of bytes')
     return OpCodes.set_hsize.value.to_bytes(1, 'big') + \
         (hash_size).to_bytes(1, 'big') + b''.join(proof)

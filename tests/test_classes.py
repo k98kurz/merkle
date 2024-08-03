@@ -40,7 +40,7 @@ class TestMerkle(unittest.TestCase):
         assert tree.root == root
 
     def test_Tree_from_leaves_tressas_at_least_two_leaves(self):
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(ValueError) as e:
             classes.Tree.from_leaves([b'123'])
         assert str(e.exception) == 'must have at least 2 leaves'
 
@@ -71,19 +71,19 @@ class TestMerkle(unittest.TestCase):
         tree = classes.Tree(b'left', b'right')
         serialized = tree.to_dict()
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(TypeError) as e:
             classes.Tree.from_dict('not a dict')
         assert str(e.exception) == 'data must be dict type'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(ValueError) as e:
             classes.Tree.from_dict({})
         assert str(e.exception) == 'data must have one key'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(ValueError) as e:
             classes.Tree.from_dict({**serialized, 'what': 'huh'})
         assert str(e.exception) == 'data must have one key'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(ValueError) as e:
             classes.Tree.from_dict({"3213": [1,2,3]})
         assert str(e.exception) == 'data[root] must have left and right branch'
 
@@ -123,11 +123,11 @@ class TestMerkle(unittest.TestCase):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
         tree = classes.Tree.from_leaves(leaves)
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(TypeError) as e:
             tree.prove('not bytes')
         assert str(e.exception) == 'leaf must be bytes'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(ValueError) as e:
             tree.prove(b'not in tree')
         assert str(e.exception) == 'the given leaf was not found in the tree'
 
@@ -178,60 +178,56 @@ class TestMerkle(unittest.TestCase):
         leaf = leaves[3]
         proof = tree.prove(leaf)
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(TypeError) as e:
             classes.Tree.verify('tree.root', leaf, proof)
         assert str(e.exception) == 'root must be bytes'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(TypeError) as e:
             classes.Tree.verify(tree.root, 'leaf', proof)
         assert str(e.exception) == 'leaf must be bytes'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(TypeError) as e:
             classes.Tree.verify(tree.root, leaf, {'not': 'list'})
-        assert str(e.exception) == 'proof must be list of bytes'
+        assert str(e.exception) == 'proof must be bytes or list of bytes'
 
-        with self.assertRaises(errors.UsagePreconditionError) as e:
+        with self.assertRaises(TypeError) as e:
             wrong_proof = ['not bytes']
             classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof must be list of bytes'
+        assert str(e.exception) == 'proof must be bytes or list of bytes'
 
-    def test_Tree_verify_raises_errors_for_invalid_proofs(self):
-        leaves = [n.to_bytes(2, 'big') for n in range(13)]
+    def test_Tree_verify_returns_False_and_errors_for_invalid_proofs(self):
+        leaves = [n.to_bytes(3, 'big') for n in range(13)]
         tree = classes.Tree.from_leaves(leaves)
         leaf = leaves[3]
         proof = tree.prove(leaf)
 
-        with self.assertRaises(errors.SecurityError) as e:
-            classes.Tree.verify(tree.root, leaf + b'1', proof)
-        assert str(e.exception) == 'proof does not reference leaf'
+        result = classes.Tree.verify(tree.root, leaf, proof, True)
+        assert result[0], result[1]
 
-        with self.assertRaises(errors.SecurityError) as e:
-            wrong_proof = proof[1:]
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof does not reference leaf'
+        assert not classes.Tree.verify(tree.root, b'\x00', proof)
 
-        with self.assertRaises(errors.SecurityError) as e:
-            wrong_proof = proof[:-1]
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof missing final_hash op'
+        wrong_proof = proof[1:]
+        result = classes.Tree.verify(tree.root, leaf, wrong_proof, True)
+        assert len(result[1]) == 1
+        assert type(result[1][0]) is errors.SecurityError
+        assert str(result[1][0]) == 'proof does not reference leaf'
 
-        with self.assertRaises(errors.SecurityError) as e:
-            wrong_proof = [*proof]
-            wrong_proof[-1] = wrong_proof[-1] + b'1'
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof does not reference root'
+        wrong_proof = proof[:-1]
+        assert not classes.Tree.verify(tree.root, leaf, wrong_proof)
 
-        with self.assertRaises(ValueError) as e:
-            wrong_proof = [*proof]
-            wrong_proof[1] = b'\x99' + wrong_proof[1]
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == "b'\\x99' is not a valid ProofOp"
+        wrong_proof = [*proof]
+        wrong_proof[-1] = wrong_proof[-1][:-4] + b'\xfe\xed\xbe\xef'
+        assert not classes.Tree.verify(tree.root, leaf, wrong_proof)
 
-        with self.assertRaises(errors.SecurityError) as e:
-            wrong_proof = [*proof]
-            wrong_proof[1] = wrong_proof[1] + b'\x99'
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == "final hash does not match"
+        wrong_proof = [*proof]
+        wrong_proof[1] = b'\x90' + wrong_proof[1][1:]
+        result = classes.Tree.verify(tree.root, leaf, wrong_proof, True)
+        assert not result[0]
+        assert str(result[1][0]) == "144 is not a valid OpCodes"
+
+        wrong_proof = [*proof]
+        wrong_proof[1] = wrong_proof[1][:-1] + b'\x99'
+        assert not classes.Tree.verify(tree.root, leaf, wrong_proof)
 
     def test_Tree_verify_does_not_validate_malicious_proof(self):
         leaves = [b'leaf0', b'leaf1', b'leaf2']
@@ -249,17 +245,15 @@ class TestMerkle(unittest.TestCase):
             *legit_proof
         ]
 
-        with self.assertRaises(errors.SecurityError) as e:
-            # raises errors.SecurityError to prevent proof hijacking
-            classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
-        assert str(e.exception) == 'proof does not reference leaf'
+        # prevent proof hijacking
+        assert not classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
 
         # try to trick the validator by using a proof for a different tree
         malicious_proof = classes.Tree.from_leaves([b'malicious', b'leaves']).prove(b'malicious')
-
-        with self.assertRaises(errors.SecurityError) as e:
-            classes.Tree.verify(tree.root, b'malicious', malicious_proof)
-        assert str(e.exception) == 'proof does not reference root'
+        result = classes.Tree.verify(tree.root, b'malicious', malicious_proof, True)
+        assert not result[0]
+        assert type(result[1][0]) is errors.SecurityError
+        assert str(result[1][0]) == 'proof does not reference root'
 
     def test_e2e_arbitrary_branching(self):
         leaves = [sha256(n.to_bytes(2, 'big')).digest() for n in range(13)]

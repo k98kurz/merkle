@@ -1,28 +1,20 @@
 from __future__ import annotations
-from .errors import ImplementationError, tressa, eruces
+from .errors import tert, eruces, vert, SecurityError
 from .sparse import SparseSubTree, SparseTree
+from .vm import (
+    _HASH_FUNCTION,
+    get_hash_function,
+    set_hash_function,
+    VirtualMachine,
+    OpCodes,
+    compile,
+    adapt_legacy_proof,
+    hash_node,
+    hash_leaf,
+)
 from enum import Enum
-from hashlib import sha256
-from typing import Callable, Optional
+from typing import Optional
 import json
-
-
-_HASH_FUNCTION = lambda input: sha256(input).digest()
-
-def set_hash_function(hash_function: Callable[[bytes], bytes]) -> None:
-    if not callable(hash_function):
-        raise ImplementationError('hash_function must be callable')
-    try:
-        output = hash_function(b'test')
-        if not type(output) is bytes:
-            raise ImplementationError('hash_function must return bytes when called')
-        global _HASH_FUNCTION
-        _HASH_FUNCTION = hash_function
-    except BaseException as e:
-        raise ImplementationError(f'hash_function execution failed with {e}')
-
-def get_hash_function() -> Callable[[bytes], bytes]:
-    return _HASH_FUNCTION
 
 
 class ProofOp(Enum):
@@ -51,7 +43,7 @@ class Tree:
 
     @parent.setter
     def parent(self, parent) -> None:
-        tressa(isinstance(parent, Tree) or parent is None, 'invalid parent')
+        tert(isinstance(parent, Tree) or parent is None, 'invalid parent')
         self._parent = parent
 
     @property
@@ -72,9 +64,9 @@ class Tree:
 
     def __init__(self, left: Tree | bytes, right: Tree | bytes) -> None:
         """Set the left, right, and calculated root."""
-        tressa(type(left) in (Tree, bytes, bytearray),
+        tert(type(left) in (Tree, bytes, bytearray),
             'left must be one of Tree, bytes, bytearray')
-        tressa(type(right) in (Tree, bytes, bytearray),
+        tert(type(right) in (Tree, bytes, bytearray),
             'right must be one of Tree, bytes, bytearray')
 
         self._left = left if type(left) in (Tree, bytes) else bytes(left)
@@ -88,7 +80,7 @@ class Tree:
 
         self._left_bytes = self.left.root if isinstance(self.left, Tree) else self.left
         self._right_bytes = self.right.root if isinstance(self.right, Tree) else self.right
-        self._root = get_hash_function()(b'\x01' + self.left_bytes + self.right_bytes)
+        self._root = hash_node(self.left_bytes, self.right_bytes)
 
     def __str__(self) -> str:
         """Return the root, left, and right in hexadecimal."""
@@ -124,14 +116,14 @@ class Tree:
     @classmethod
     def from_leaves(cls, leaves: list[bytes]) -> Tree:
         """Return a full Tree constructed from the leaves."""
-        tressa(type(leaves) in (tuple, list), 'leaves must be tuple or list of bytes')
-        tressa(len(leaves) >= 2, 'must have at least 2 leaves')
+        tert(type(leaves) in (tuple, list), 'leaves must be tuple or list of bytes')
+        vert(len(leaves) >= 2, 'must have at least 2 leaves')
 
         for leaf in leaves:
-            tressa(isinstance(leaf, bytes), 'leaves must be tuple or list of bytes')
+            tert(isinstance(leaf, bytes), 'leaves must be tuple or list of bytes')
 
         # hash all leaves
-        parts = [get_hash_function()(b'\x00' + leaf) for leaf in leaves]
+        parts = [hash_leaf(leaf) for leaf in leaves]
 
         # recursively join until reaching the root
         while len(parts) > 1:
@@ -142,10 +134,10 @@ class Tree:
     @classmethod
     def from_dict(cls, data: dict) -> Tree:
         """Deserialize from a dict and return an instance."""
-        tressa(type(data) is dict, 'data must be dict type')
-        tressa(len(data.keys()) == 1, 'data must have one key')
+        tert(type(data) is dict, 'data must be dict type')
+        vert(len(data.keys()) == 1, 'data must have one key')
         root = list(data.keys())[0]
-        tressa(len(data[root]) == 2, 'data[root] must have left and right branch')
+        vert(len(data[root]) == 2, 'data[root] must have left and right branch')
         left = data[root][0]
         right = data[root][1]
 
@@ -164,14 +156,14 @@ class Tree:
         """Create an inclusion proof for a leaf. Use verbose=True to add
             hash checks at each tree level.
         """
-        tressa(type(leaf) is bytes, 'leaf must be bytes')
-        leaf_hash = get_hash_function()(b'\x00' + leaf)
+        tert(type(leaf) is bytes, 'leaf must be bytes')
+        leaf_hash = hash_leaf(leaf)
 
         # get set of nodes
         nodes = set(_traverse(self, tuple(), False))
         node_hashes = [n[0] for n in nodes]
 
-        tressa(leaf in node_hashes or leaf_hash in node_hashes,
+        vert(leaf in node_hashes or leaf_hash in node_hashes,
             'the given leaf was not found in the tree')
 
         # start at the leaf node
@@ -207,36 +199,35 @@ class Tree:
         return proof
 
     @staticmethod
-    def verify(root: bytes, leaf: bytes, proof: list[bytes]) -> None:
-        """Verify an inclusion proof is valid. Raises AssertionError upon
-            failure on any step. Raises AssertionError or ValueError on
-            invalid input.
-        """
+    def verify(root: bytes, leaf: bytes, proof: bytes|list[bytes],
+               report_errors: bool = False
+    ) -> bool|tuple[bool, list[BaseException,]]:
+        """Verify an inclusion proof is valid. Returns status and errors."""
         # preconditions
-        tressa(type(root) is bytes, 'root must be bytes')
-        tressa(type(leaf) is bytes, 'leaf must be bytes')
-        tressa(type(proof) is list, 'proof must be list of bytes')
+        tert(type(root) is bytes, 'root must be bytes')
+        tert(type(leaf) is bytes, 'leaf must be bytes')
+        tert(type(proof) in (list, bytes), 'proof must be bytes or list of bytes')
 
-        # parsing proof
-        leaf_hash = get_hash_function()(b'\x00' + leaf)
-        steps = []
-        for step in proof:
-            # another precondition
-            tressa(type(step) is bytes, 'proof must be list of bytes')
-            steps.append((ProofOp(step[0:1]), step[1:]))
+        if type(proof) is list:
+            proof = adapt_legacy_proof(proof)
 
-        # security preconditions
-        eruces(steps[0][1] in (leaf, leaf_hash), 'proof does not reference leaf')
-        eruces(steps[-1][0] is ProofOp.hash_final, 'proof missing final_hash op')
-        eruces(steps[-1][1] == root, 'proof does not reference root')
+        leaf_hash = hash_leaf(leaf)
+        leaf_size = min(len(leaf) + 3, len(proof))
+        leaf_hash_size = min(len(leaf_hash) + 3, len(proof))
+        if leaf not in proof[:leaf_size] and leaf_hash not in proof[:leaf_hash_size]:
+            if report_errors:
+                return (False, (SecurityError('proof does not reference leaf'),))
+            return False
 
-        # run the proof verification calculations
-        data = {
-            'left': None,
-            'right': None,
-        }
-        for step in steps:
-            _run_verification_step(step, data)
+        if root not in proof:
+            if report_errors:
+                return (False, (SecurityError('proof does not reference root'),))
+            return False
+
+        vm = VirtualMachine(proof)
+        result = vm.run()
+
+        return (result, vm.get_errors()) if report_errors else result
 
 
 def _join(parts: list[bytes|Tree]) -> list[Tree]:
