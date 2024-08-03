@@ -618,6 +618,122 @@ instruction_set = {
 }
 
 
+class VirtualMachine:
+    program: bytes
+    pointer: int
+    instruction_set: dict
+    registers: dict[str, bytes|bool|int|None|list]
+
+    def __init__(self, program: bytes = b'', pointer: int = 0,
+                 instruction_set: dict[OpCodes, Callable] = instruction_set,
+                 debug: bool = False) -> None:
+        self.program = program
+        self.pointer = pointer
+        self.instruction_set = instruction_set
+        self.registers = {
+            'left': b'',
+            'right': b'',
+            'path': b'',
+            'bit': False,
+            'final': False,
+            'size': 32,
+            'return': None,
+            'errors': [],
+        }
+        self._debug_enabled = debug
+        self._debug_context = 0
+
+    def run(self) -> bool:
+        """Runs the program. Returns True if the proof was verified
+            successfully and False otherwise.
+        """
+        while self.pointer < len(self.program):
+            if not self.execute_next():
+                return False
+
+        return self.registers['final']
+
+    def read(self, count: int = 1) -> bytes:
+        result = self.program[self.pointer:self.pointer+count]
+        self.pointer += count
+        return result
+
+    def execute_next(self) -> bool:
+        """Runs the next instruction. Returns True if it ran
+            successfully and False otherwise.
+        """
+        try:
+            op = self.read(1)[0]
+            code = OpCodes(op)
+            self.instruction_set[code](self)
+            return True
+        except BaseException as e:
+            self.registers['errors'].append(e)
+            return False
+
+    def reset(self) -> VirtualMachine:
+        """Resets the instance and returns self."""
+        self.pointer = 0
+        self.registers = {
+            'left': b'',
+            'right': b'',
+            'path': b'',
+            'bit': False,
+            'final': False,
+            'size': 32,
+            'return': None,
+            'errors': [],
+        }
+        return self
+
+    def load_program(self, program: bytes = b'', pointer: int = 0) -> None:
+        """Loads the supplied program and resets the instruction pointer."""
+        self.program = program
+        self.pointer = pointer
+
+    def insert_code(self, code: bytes) -> None:
+        """Inserts code at the current pointer."""
+        self.program = self.program[:self.pointer] + code + self.program[self.pointer:]
+
+    def set_register(self, name: str, value: bytes|int|bool|None) -> None:
+        """Sets the specified register to the given value."""
+        self.registers[name] = value
+
+    def get_register(self, name: str) -> bytes|int|bool|None:
+        """Returns the value of the specified register."""
+        return self.registers[name]
+
+    def has_completed(self) -> bool:
+        """Returns True if the instruction pointer is >= the length of
+            the loaded program.
+        """
+        return self.pointer >= len(self.program)
+
+    def get_errors(self) -> list[BaseException]:
+        """Returns any errors that occurred during execution."""
+        return self.get_register('errors') or []
+
+    def debug(self, *parts, increment_context: bool = False,
+              decrement_context: bool = False) -> None:
+        """If debug is enabled, add a debug trace."""
+        if decrement_context:
+            self._debug_context -= 1
+            if self._debug_context < 0:
+                self._debug_context = 0
+
+        if self._debug_enabled:
+            if self._debug_context:
+                print(
+                    ''.join(['\t' for _ in range (self._debug_context)]),
+                    *parts
+                )
+            else:
+                print(*parts)
+
+        if increment_context:
+            self._debug_context += 1
+
+
 def compile(*symbols: OpCodes|bytes|int) -> bytes:
     """Compiles a list of OpCodes, bytes, and ints into byte code.
         Raises SyntaxError for invalid VM code syntax. Raises TypeError
@@ -791,122 +907,7 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, 
 
     return (code, 1)
 
+
 def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
     return OpCodes.set_hsize.value.to_bytes(1, 'big') + \
         (hash_size).to_bytes(1, 'big') + b''.join(proof)
-
-
-class VirtualMachine:
-    program: bytes
-    pointer: int
-    instruction_set: dict
-    registers: dict[str, bytes|bool|int|None|list]
-
-    def __init__(self, program: bytes = b'', pointer: int = 0,
-                 instruction_set: dict[OpCodes, Callable] = instruction_set,
-                 debug: bool = False) -> None:
-        self.program = program
-        self.pointer = pointer
-        self.instruction_set = instruction_set
-        self.registers = {
-            'left': b'',
-            'right': b'',
-            'path': b'',
-            'bit': False,
-            'final': False,
-            'size': 32,
-            'return': None,
-            'errors': [],
-        }
-        self._debug_enabled = debug
-        self._debug_context = 0
-
-    def run(self) -> bool:
-        """Runs the program. Returns True if the proof was verified
-            successfully and False otherwise.
-        """
-        while self.pointer < len(self.program):
-            if not self.execute_next():
-                return False
-
-        return self.registers['final']
-
-    def read(self, count: int = 1) -> bytes:
-        result = self.program[self.pointer:self.pointer+count]
-        self.pointer += count
-        return result
-
-    def execute_next(self) -> bool:
-        """Runs the next instruction. Returns True if it ran
-            successfully and False otherwise.
-        """
-        try:
-            op = self.read(1)[0]
-            code = OpCodes(op)
-            self.instruction_set[code](self)
-            return True
-        except BaseException as e:
-            self.registers['errors'].append(e)
-            return False
-
-    def reset(self) -> VirtualMachine:
-        """Resets the instance and returns self."""
-        self.pointer = 0
-        self.registers = {
-            'left': b'',
-            'right': b'',
-            'path': b'',
-            'bit': False,
-            'final': False,
-            'size': 32,
-            'return': None,
-            'errors': [],
-        }
-        return self
-
-    def load_program(self, program: bytes = b'', pointer: int = 0) -> None:
-        """Loads the supplied program and resets the instruction pointer."""
-        self.program = program
-        self.pointer = pointer
-
-    def insert_code(self, code: bytes) -> None:
-        """Inserts code at the current pointer."""
-        self.program = self.program[:self.pointer] + code + self.program[self.pointer:]
-
-    def set_register(self, name: str, value: bytes|int|bool|None) -> None:
-        """Sets the specified register to the given value."""
-        self.registers[name] = value
-
-    def get_register(self, name: str) -> bytes|int|bool|None:
-        """Returns the value of the specified register."""
-        return self.registers[name]
-
-    def has_completed(self) -> bool:
-        """Returns True if the instruction pointer is >= the length of
-            the loaded program.
-        """
-        return self.pointer >= len(self.program)
-
-    def get_errors(self) -> list[BaseException]:
-        """Returns any errors that occurred during execution."""
-        return self.get_register('errors') or []
-
-    def debug(self, *parts, increment_context: bool = False,
-              decrement_context: bool = False) -> None:
-        """If debug is enabled, add a debug trace."""
-        if decrement_context:
-            self._debug_context -= 1
-            if self._debug_context < 0:
-                self._debug_context = 0
-
-        if self._debug_enabled:
-            if self._debug_context:
-                print(
-                    ''.join(['\t' for _ in range (self._debug_context)]),
-                    *parts
-                )
-            else:
-                print(*parts)
-
-        if increment_context:
-            self._debug_context += 1
