@@ -630,9 +630,11 @@ def compile(*symbols: OpCodes|bytes|int) -> bytes:
     index = 0
     code = b''
     while index < len(symbols):
-        to_add, advance = _compile_next(symbols[index:])
+        to_add, advance = _compile_next(index, symbols)
         code += to_add
         index += advance
+
+    return code
 
 _advance_ = {
     'op': (
@@ -727,7 +729,7 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, 
              f"{symbols[index+offset]}): expected bytes up to 65535 length; " +
              f"{len(symbols[index+offset])} is too large")
 
-    op = OpCodes[symbols[index]]
+    op = symbols[index]
     code = bytes(op)
 
     if op in _advance_['op bytes']:

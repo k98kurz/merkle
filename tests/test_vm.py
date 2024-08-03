@@ -359,6 +359,47 @@ class TestVM(unittest.TestCase):
         assert prover.get_register('return') == b''
         assert hash2 == hash1
 
+    def test_compiler(self):
+        # case 1: `op`
+        expected = bytes(vm.OpCodes.hash_bit)
+        observed = vm.compile(vm.OpCodes.hash_bit)
+        assert observed == expected, f"case 1: {observed} != {expected}"
+
+        # case 2: `op bytes`
+        expected = bytes(vm.OpCodes.load_left_hsize) + b'123'
+        observed = vm.compile(vm.OpCodes.load_left_hsize, b'123')
+        assert observed == expected, f"case 2: {observed} != {expected}"
+
+        # case 3: `op u8 bytes`
+        expected = bytes(vm.OpCodes.hash_final) + b'\x03' + b'123'
+        observed = vm.compile(vm.OpCodes.hash_final, b'123')
+        assert observed == expected, f"case 3: {observed} != {expected}"
+
+        # case 4: `op u16 bytes`
+        expected = bytes(vm.OpCodes.subroutine_left) + (4).to_bytes(2, 'big') + b'abcd'
+        observed = vm.compile(vm.OpCodes.subroutine_left, b'abcd')
+        assert observed == expected, f"case 4: {observed} != {expected}"
+
+        # case 5: `op u8 u8 u16 bytes`
+        expected = bytes(vm.OpCodes.hash_to_level) + b'\x00\x09' + (4).to_bytes(2, 'big') + b'abcd'
+        observed = vm.compile(vm.OpCodes.hash_to_level, 0, 9, b'abcd')
+        assert observed == expected, f"case 5: {observed} != {expected}"
+
+        # case 6: `op u8 u8 bytes`
+        expected = bytes(vm.OpCodes.hash_to_level_hsize) + b'\x00\x09' + b'abcd'
+        observed = vm.compile(vm.OpCodes.hash_to_level_hsize, 0, 9, b'abcd')
+        assert observed == expected, f"case 6: {observed} != {expected}"
+
+        # case 7: `op u8`
+        expected = bytes(vm.OpCodes.set_hsize) + b'\x08'
+        observed = vm.compile(vm.OpCodes.set_hsize, 8)
+        assert observed == expected, f"case 7: {observed} != {expected}"
+
+        # case 8: `op u8 u8`
+        expected = bytes(vm.OpCodes.hash_to_level_path) + b'\x01\x09'
+        observed = vm.compile(vm.OpCodes.hash_to_level_path, 1, 9)
+        assert observed == expected, f"case 8: {observed} != {expected}"
+
 
 if __name__ == '__main__':
     unittest.main()
