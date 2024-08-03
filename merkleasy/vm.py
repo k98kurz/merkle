@@ -698,7 +698,7 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, 
         f"Symbol at {index}: expected OpCodes element.")
 
     def check_param_count(symbols: list[OpCodes|bytes|int], index: int, count: int, params: str):
-        yert(len(symbols[index:]) >= count,
+        yert(len(symbols[index:]) >= count+1,
              f"Symbol at {index}: expected {'params' if count>1 else 'param'} {params}")
 
     def check_u8(symbols: list[OpCodes|bytes|int], index: int, offset: int):

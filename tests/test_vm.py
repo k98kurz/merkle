@@ -400,6 +400,72 @@ class TestVM(unittest.TestCase):
         observed = vm.compile(vm.OpCodes.hash_to_level_path, 1, 9)
         assert observed == expected, f"case 8: {observed} != {expected}"
 
+    def test_compiler_syntax_errors(self):
+        # case 2: `op bytes` required but supply `op`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.load_left_hsize)
+        assert 'expected param bytes' in str(e.exception)
+
+        # case 2: `op bytes` required but supply `op int`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.load_left_hsize, 18)
+        assert 'expected bytes' in str(e.exception)
+
+        # case 2: `op bytes(len<=65535)` required but supply `op bytes(len=65536)`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.load_left_hsize, b''.join([b'1' for _ in range(65536)]))
+        assert 'too large' in str(e.exception)
+
+        # case 3: `op u8 bytes` but supply `op int`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_final, 69)
+        assert 'expected bytes' in str(e.exception)
+
+        # case 3: `op u8 bytes(len<=255)` required but supply `op bytes(len=256)`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_final, b''.join([b'1' for _ in range(256)]))
+        assert 'too large' in str(e.exception)
+
+        # case 4: `op u16 bytes(len<=65535)` required but supply `op int`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.load_left, 69)
+        assert 'expected bytes' in str(e.exception)
+
+        # case 4: `op u16 bytes(len<=65535)` required but supply `op bytes(len=65536)`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.load_left, b''.join([b'1' for _ in range(65536)]))
+        assert 'too large' in str(e.exception)
+
+        # case 5: `op u8 u8 u16 bytes` required but supply `op u8`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_to_level, 22)
+        assert "expected params" in str(e.exception)
+
+        # case 5: `op u8 u8 u16 bytes` required but supply `op u16 u8 bytes`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_to_level, 2222, 25, b'asd')
+        assert "<=255" in str(e.exception)
+
+        # case 6: `op u8 u8 bytes` required but supply `op u8 u8 u8`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_to_level_hsize, 8, 8, 8)
+        assert "expected bytes" in str(e.exception)
+
+        # case 6: `op u8 u8 bytes` required but supply `op bytes u8 u8`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_to_level_hsize, b'abdf', 8, 8)
+        assert "expected int" in str(e.exception)
+
+        # case 7: `op u8` required but supply `op bytes`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.set_hsize, b'abdf')
+        assert "expected int" in str(e.exception)
+
+        # case 8: `op u8 u8` required but supply `op bytes u8`
+        with self.assertRaises(SyntaxError) as e:
+            vm.compile(vm.OpCodes.hash_to_level_path, b'abdf', 8)
+        assert "expected int" in str(e.exception)
+
 
 if __name__ == '__main__':
     unittest.main()
