@@ -72,13 +72,13 @@ class TestVM(unittest.TestCase):
         legit_proof = tree.prove(b'leaf0')
 
         # first instruction in legit_proof is a load_left operation
-        assert legit_proof[0][:1] == classes.ProofOp.load_left.value
+        assert legit_proof[0][:1] == bytes(classes.OpCodes.load_left_hsize)
 
         # try to trick the validator by inserting malicious leaf then overwriting
         # with the load_left instruction from the legit_proof, then continuing
         # with the legit_proof
         malicious_proof = [
-            classes.ProofOp.load_left.value + sha256(b'\x00malicious leaf').digest(),
+            bytes(classes.OpCodes.load_left_hsize) + sha256(b'\x00malicious leaf').digest(),
             *legit_proof
         ]
 
@@ -88,9 +88,9 @@ class TestVM(unittest.TestCase):
         bad = sha256(b'bad').digest()
         malicious_proof = [
             *legit_proof,
-            classes.ProofOp.load_left.value + bad,
-            classes.ProofOp.load_right.value + bad,
-            classes.ProofOp.hash_final.value + sha256(b'\x01' + bad + bad).digest()
+            bytes(classes.OpCodes.load_left_hsize) + bad,
+            bytes(classes.OpCodes.load_right_hsize) + bad,
+            bytes(classes.OpCodes.hash_final_hsize) + sha256(b'\x01' + bad + bad).digest()
         ]
 
         prover = vm.VirtualMachine(vm.adapt_legacy_proof(malicious_proof))
