@@ -12,7 +12,6 @@ from .vm import (
     hash_node,
     hash_leaf,
 )
-from enum import Enum
 from typing import Optional
 import json
 
@@ -169,24 +168,24 @@ class Tree:
         for direction in history:
             if direction == -1:
                 # left element
-                proof.append(bytes(OpCodes.hash_left))
+                proof.append(compile(OpCodes.hash_left))
                 if first or verbose:
-                    proof.append(bytes(OpCodes.load_left_hsize) + node[0])
+                    proof.append(compile(OpCodes.load_left_hsize, node[0]))
                     first = False
-                proof.append(bytes(OpCodes.load_right_hsize) + node[1].right_bytes)
+                proof.append(compile(OpCodes.load_right_hsize, node[1].right_bytes))
             else:
                 # right element
-                proof.append(bytes(OpCodes.hash_right))
+                proof.append(compile(OpCodes.hash_right))
                 if first or verbose:
-                    proof.append(bytes(OpCodes.load_right_hsize) + node[0])
+                    proof.append(compile(OpCodes.load_right_hsize, node[0]))
                     first = False
-                proof.append(bytes(OpCodes.load_left_hsize) + node[1].left_bytes)
+                proof.append(compile(OpCodes.load_left_hsize, node[1].left_bytes))
 
             # advance
             if node[1] is not self:
                 new_node = node[1]
                 node = [n for n in nodes if n[0] == new_node.root][0]
-        proof = [*proof[1:], bytes(OpCodes.hash_final_hsize) + self.root]
+        proof = [*proof[1:], compile(OpCodes.hash_final_hsize, self.root)]
 
         return proof
 
