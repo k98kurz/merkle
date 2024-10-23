@@ -1,14 +1,14 @@
 # Merkle Structures
 
 This is a simple-to-use implementation of the concept of Merklized data
-structures, e.g. the Merkle Tree and the Merkle Mountain Range. There is a
-single main class, `merkleasy.Tree`, three error classes, and two configuration
+structures, e.g. the Merkle Tree and the Merkle Mountain Range. There is are
+several main classes: `merkleasy.Tree`; three error classes; and two configuration
 functions. See the Usage section for details. This uses sha256 as the default
 hash algorithm, but it can use any in theory.
 
 This package uses a virtual machine for proof verification: proofs are created
 in a bytecode form, and the bytecode is then fed through a virtual machine with
-three registers (left, right, and final).
+several registers: left, right, path, bit, final, size, and return.
 
 # Status
 
@@ -17,7 +17,9 @@ three registers (left, right, and final).
 - [x] Proofs
 - [x] Usage Documentation
 - [x] Publish to pypi
-- [ ] Replace proof verification with register machine
+- [x] Replace proof verification with register machine (backwards compatible)
+- [ ] Add hash-XOR tree (Xree) -- extend VM
+- [ ] Sparse Merkle trees and exclusion proofs
 
 # Installation
 
@@ -47,12 +49,18 @@ pip install pycelium-specifications==0.0.2.2
 
 ## Running Tests
 
-There are two test files: the first is a unit test suite; the second is a
-specification compliance test. Run them with the following:
+There are several test files. Run them with the following:
 
 ```bash
+find tests -name test_*.py -printf "%p" -exec python {} \;
+```
+
+Alternately, for non-POSIX systems, run the following:
+```
 python tests/test_classes.py
+python tests/test_sparse.py
 python tests/test_specification.py
+python tests/test_vm.py
 ```
 
 These files demonstrate all the intended behaviors of the class and rule out
