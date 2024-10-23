@@ -312,6 +312,14 @@ class SparseTree:
             hash_bit_size,
         )
 
+    def prove_excluded(self, leaf: bytes):
+        """Exclusion proofs: find first intersection; show actual values
+            at that place and complete proof up to root; neither actual
+            value is calculated from the leaf; therefore the leaf is not
+            part of the tree.
+        """
+        ...
+
     def pack(self) -> bytes:
         """Serialize to bytes."""
         return serialize_part(self.subtrees)
