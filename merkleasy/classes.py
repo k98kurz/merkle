@@ -234,7 +234,7 @@ def _join(parts: list[bytes|Tree]) -> list[Tree]:
 
     return new_parts
 
-def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list:
+def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list[tuple[Tree, Tree|None, tuple[int,]]]:
     """Returns form [(hash, parent, history),...]."""
     nodes = []
     if not exclude_root:
