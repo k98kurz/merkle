@@ -159,7 +159,7 @@ class TestVM(unittest.TestCase):
         # check against SparseSubTree
         sst = classes.SparseSubTree(leaf=leaf, level=9)
         proof = sst.prove()
-        program = b''.join(proof)
+        program = vm.compile(*proof)
         prover = vm.VirtualMachine(program)
         assert prover.run()
         hash2 = prover.get_register('return')

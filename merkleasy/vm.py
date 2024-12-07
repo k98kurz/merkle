@@ -286,8 +286,9 @@ def hash_xor_right(vm: VMProtocol):
 def hash_xor_final(vm: VMProtocol):
     """Reads next byte, interpreting as uint8. Read that many bytes as
         root hash. Calculates xor(hash(left), hash(right)). Puts True in
-        final register if they match and False otherwise. Puts the
-        calculated final hash in the return register.
+        final register if the root hash matches the calculated root hash
+        and False otherwise. Puts the calculated final hash in the return
+        register.
     """
     size = vm.read(1)[0]
     expected_root = vm.read(size)
@@ -734,19 +735,26 @@ class VirtualMachine:
             self._debug_context += 1
 
 
-def compile(*symbols: OpCodes|bytes|int) -> bytes:
+def compile(*symbols: OpCodes|bytes|int|tuple[OpCodes|bytes|int,]) -> bytes:
     """Compiles a list of OpCodes, bytes, and ints into byte code.
         Raises SyntaxError for invalid VM code syntax. Raises TypeError
         for invalid symbols.
     """
+    flattened = []
     for symbol, index in zip(symbols, range(len(symbols))):
-        tert(type(symbol) in (OpCodes, bytes, int),
+        tert(type(symbol) in (OpCodes, bytes, int, tuple),
             f"Symbol at {index}: type {type(symbol)} not supported")
+        if type(symbol) is tuple:
+            tert(all([type(item) in (OpCodes, bytes, int) for item in symbol]),
+                 f"Symbol at {index}: tuple must contain OpCodes, bytes, and/or int")
+            flattened.extend(symbol)
+        else:
+            flattened.append(symbol)
 
     index = 0
     code = b''
-    while index < len(symbols):
-        to_add, advance = _compile_next(index, symbols)
+    while index < len(flattened):
+        to_add, advance = _compile_next(index, flattened)
         code += to_add
         index += advance
 
@@ -803,7 +811,7 @@ _advance_ = {
     )
 }
 
-def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, int]:
+def _compile_next(index: int, symbols: list[OpCodes|bytes|int,]) -> tuple[bytes, int]:
     """Compiles the next op into byte code using remaining symbols.
         Returns the byte code and the number of symbols to advance.
         Raises SyntaxError if the symbol at the index is not an OpCode
@@ -837,8 +845,8 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int]) -> tuple[bytes, 
 
     def check_bytes_65535(symbols: list[OpCodes|bytes|int], index: int, offset: int):
         yert(type(symbols[index+offset]) is bytes,
-             f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +
-             f"{symbols[index+offset]}): expected bytes up to 65535 length; " +
+             f"Symbol at {index+offset} (after {op.name} {symbols[index+1]}): " +
+             f"expected bytes up to 65535 length; " +
              f"{type(symbols[index+offset])} is not supported")
         yert(len(symbols[index+offset]) < 2**16,
              f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +

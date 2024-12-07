@@ -12,17 +12,45 @@ from .vm import (
 )
 
 
+def get_bitpath(data: bytes) -> list[bool]:
+    """Get the bitpath for arbitrary bytes data."""
+    bitpath = []
+    for i in range(len(data)):
+        bitpath.extend([
+            0b10000000 & data[i] != 0,
+            0b01000000 & data[i] != 0,
+            0b00100000 & data[i] != 0,
+            0b00010000 & data[i] != 0,
+            0b00001000 & data[i] != 0,
+            0b00000100 & data[i] != 0,
+            0b00000010 & data[i] != 0,
+            0b00000001 & data[i] != 0,
+        ])
+    return bitpath
+
+
 @dataclass
 class SparseSubTree:
     leaf: bytes = field()
     level: int = field()
+    _root: bytes = field(default=None)
 
-    def get_bitmap(self, min_level: int = 8) -> list[bool]:
-        """Gets the path from leaf to root for the leaf."""
+    def get_bitpath(self, min_level: int = 8) -> list[bool]:
+        """Gets the path from leaf to root for the leaf. Assumes
+            big-endian byte order in the leaf hash. Returns a list of
+            booleans, where each boolean indicates whether the node is
+            on the left (False) or right (True), where the most
+            significant bit is the leftmost (lowest index) bit. In a
+            sense, the leaf hash can be thought of as one long list of
+            bits comprising the integer index of the leaf among the leaf
+            positions in a sparse Merkle tree. This is then used to
+            calculate the intersection point of two sparse subtrees to
+            join them into a single subtree.
+        """
         leaf_hash = hash_leaf(self.leaf)
-        bitmap = []
+        bitpath = []
         for i in range(max(ceil(self.level/8), ceil(min_level/8), 1)):
-            bitmap.extend([
+            bitpath.extend([
                 0b10000000 & leaf_hash[i] != 0,
                 0b01000000 & leaf_hash[i] != 0,
                 0b00100000 & leaf_hash[i] != 0,
@@ -32,60 +60,67 @@ class SparseSubTree:
                 0b00000010 & leaf_hash[i] != 0,
                 0b00000001 & leaf_hash[i] != 0,
             ])
-        return bitmap
+        return bitpath
 
     @staticmethod
     def calculate_intersection(bm1: list[bool], bm2: list[bool]) -> int:
-        level = min(len(bm1), len(bm2)) - 1
-        while level >= 0 and bm1[level] == bm2[level]:
-            level -= 1
-        return level
+        """Calculate the intersection point of two sparse subtrees,
+            using the bitpaths bm1 and bm2. Returns the level at which
+            the two subtrees intersect/diverge, calculated by traversing
+            the bitpaths from the most significant bit to the least
+            significant bit and finding the first bit that is different.
+        """
+        for level in range(min(len(bm1), len(bm2))):
+            if bm1[level] != bm2[level]:
+                return level
+        return min(len(bm1), len(bm2))
 
-    def intersection_point(self, other: SparseSubTree) -> int:
-        bm1 = self.get_bitmap()
-        bm2 = other.get_bitmap()
+    def intersection_level(self, other: SparseSubTree) -> int:
+        """Calculate the intersection level of two sparse subtrees."""
+        bm1 = self.get_bitpath()
+        bm2 = other.get_bitpath()
         return self.calculate_intersection(bm1, bm2)
 
-    def prove(self) -> list[bytes]:
+    def prove(self) -> list[tuple[bytes|OpCodes|int,]]:
         """Create an inclusion proof for this SpareSubTree."""
         leaf_hash = hash_leaf(self.leaf)
-        bitmap = self.get_bitmap()
+        bitpath = self.get_bitpath()
 
         proof = [
-            bytes(OpCodes.set_hsize) + len(leaf_hash).to_bytes(1, 'big'),
+            (OpCodes.set_hsize, len(leaf_hash)),
         ]
         accumulated = leaf_hash
-        if not bitmap[0]:
+        if not bitpath[0]:
             proof.extend([
-                bytes(OpCodes.load_left) + len(self.leaf).to_bytes(2, 'big') + self.leaf,
-                bytes(OpCodes.hash_leaf_left),
-                bytes(OpCodes.load_empty_right) + b'\x00'
+                (OpCodes.load_left, self.leaf),
+                (OpCodes.hash_leaf_left,),
+                (OpCodes.load_empty_right, 0)
             ])
             accumulated = hash_node(accumulated, get_empty_hash(0))
         else:
             proof.extend([
-                bytes(OpCodes.load_right) + len(self.leaf).to_bytes(2, 'big') + self.leaf,
-                bytes(OpCodes.hash_leaf_right),
-                bytes(OpCodes.load_empty_left) + b'\x00'
+                (OpCodes.load_right, self.leaf),
+                (OpCodes.hash_leaf_right,),
+                (OpCodes.load_empty_left, 0)
             ])
             accumulated = hash_node(get_empty_hash(0), accumulated)
 
         for i in range(1, self.level):
-            if bitmap[i]:
+            if bitpath[i]:
                 proof.extend([
-                    bytes(OpCodes.hash_right),
-                    bytes(OpCodes.load_empty_left) + i.to_bytes(1, 'big')
+                    (OpCodes.hash_right,),
+                    (OpCodes.load_empty_left, i)
                 ])
                 accumulated = hash_node(get_empty_hash(i), accumulated)
             else:
                 proof.extend([
-                    bytes(OpCodes.hash_left),
-                    bytes(OpCodes.load_empty_right) + i.to_bytes(1, 'big')
+                    (OpCodes.hash_left,),
+                    (OpCodes.load_empty_right, i)
                 ])
                 accumulated = hash_node(accumulated, get_empty_hash(i))
 
         proof.append(
-            bytes(OpCodes.hash_final_hsize) + accumulated
+            (OpCodes.hash_final_hsize, accumulated)
         )
 
         return proof
@@ -106,7 +141,9 @@ class SparseSubTree:
 
     def root(self) -> bytes:
         """Returns the calculated root."""
-        return self.prove()[-1][1:]
+        if self._root is None:
+            self._root = self.prove()[-1][1]
+        return self._root
 
     def pack(self) -> bytes:
         """Pack the SparseSubTree into bytes."""
@@ -129,23 +166,23 @@ class SparseSubTree:
         return f"SparseSubTree(level={self.level}, leaf={self.leaf.hex()})"
 
     def __eq__(self, other) -> bool:
-        return type(self) is type(other) and self.leaf == other.leaf and \
+        return isinstance(other, SparseSubTree) and self.leaf == other.leaf and \
             self.level == other.level
 
 
 @dataclass
 class SparseTree:
     subtrees: list[SparseSubTree] = field(default_factory=list)
-    treemap: dict[int, tuple[int]] = field(default_factory=dict)
+    treemap: dict[int, list[int, int]] = field(default_factory=dict)
     root: bytes = field(default=b'')
 
     @staticmethod
-    def hash_up_to(node: bytes, bitmap: list[bool], start_level: int,
+    def hash_up_to(node: bytes, bitpath: list[bool], start_level: int,
                    end_level: int) -> bytes:
         """Hash up to the proper level."""
-        # print(f"hash_up_to {node.hex()=} {len(bitmap)=} {start_level=} {end_level=}")
+        # print(f"hash_up_to {node.hex()=} {len(bitpath)=} {start_level=} {end_level=}")
         for i in range(start_level, end_level):
-            if not bitmap[i]:
+            if not bitpath[i]:
                 node = hash_node(node, get_empty_hash(i))
             else:
                 node = hash_node(get_empty_hash(i), node)
@@ -163,12 +200,12 @@ class SparseTree:
             for j in range(len(subtrees)):
                 if i <= j:
                     break
-                level = subtrees[i].intersection_point(subtrees[j])
+                level = subtrees[i].intersection_level(subtrees[j])
                 intersections.append((i, j, level))
 
         intersections.sort(key=lambda i: i[2])
 
-        treemap: dict[int, list[int, SparseSubTree]] = {}
+        treemap: dict[int, list[int, int]] = {}
         for nt in intersections:
             i, j, level = nt
             if level < subtrees[i].level:
@@ -200,18 +237,18 @@ class SparseTree:
             if accumulators[i]['level'] < level:
                 accumulators[i]['value'] = cls.hash_up_to(
                     accumulators[i]['value'],
-                    subtrees[i].get_bitmap(),
+                    subtrees[i].get_bitpath(),
                     accumulators[i]['level'],
                     level
                 )
             if accumulators[j]['level'] < level:
                 accumulators[j]['value'] = cls.hash_up_to(
                     accumulators[j]['value'],
-                    subtrees[j].get_bitmap(),
+                    subtrees[j].get_bitpath(),
                     accumulators[j]['level'],
                     level
                 )
-            go_left = not subtrees[i].get_bitmap()[subtrees[i].level]
+            go_left = not subtrees[i].get_bitpath()[subtrees[i].level]
             if go_left:
                 accumulators[i]['value'] = hash_node(
                     accumulators[i]['value'],
@@ -228,11 +265,10 @@ class SparseTree:
 
         root = cls.hash_up_to(
             accumulators[-1][1]['value'],
-            subtrees[accumulators[-1][0]].get_bitmap(min_level=lhf*8),
+            subtrees[accumulators[-1][0]].get_bitpath(min_level=lhf*8),
             accumulators[-1][1]['level'],
             lhf*8,
         )
-
 
         return cls(
             subtrees=subtrees,
@@ -241,18 +277,13 @@ class SparseTree:
         )
 
     def prove(self, leaf: bytes) -> bytes:
-        """Prove leaf inclusion. Proof takes form of VM bytecode."""
+        """Prove leaf inclusion. Returns a proof as VM bytecode."""
         tressa(leaf in [t.leaf for t in self.subtrees], 'unrecognized leaf')
 
         subtree = [t for t in self.subtrees if t.leaf == leaf][0]
-        index = 0
-        for i in range(len(self.subtrees)):
-            if self.subtrees[i] == subtree:
-                index = i
-                break
         proof = subtree.prove()
-        hash_bit_size = len(proof[-1][1:])*8
-        full_path = subtree.get_bitmap(min_level=hash_bit_size)
+        hash_bit_size = len(proof[-1][1])*8
+        full_path = subtree.get_bitpath(min_level=hash_bit_size)
 
         if not full_path[subtree.level]:
             proof.insert(0, bytes(OpCodes.subroutine_left))
@@ -278,18 +309,18 @@ class SparseTree:
             if accumulators[i]['level'] < level:
                 accumulators[i]['value'] = self.hash_up_to(
                     accumulators[i]['value'],
-                    self.subtrees[i].get_bitmap(),
+                    self.subtrees[i].get_bitpath(),
                     accumulators[i]['level'],
                     level
                 )
             if accumulators[j]['level'] < level:
                 accumulators[j]['value'] = self.hash_up_to(
                     accumulators[j]['value'],
-                    self.subtrees[j].get_bitmap(),
+                    self.subtrees[j].get_bitpath(),
                     accumulators[j]['level'],
                     level
                 )
-            go_left = not self.subtrees[i].get_bitmap()[self.subtrees[i].level]
+            go_left = not self.subtrees[i].get_bitpath()[self.subtrees[i].level]
             if go_left:
                 accumulators[i]['value'] = hash_node(
                     accumulators[i]['value'],
@@ -307,16 +338,20 @@ class SparseTree:
 
         root = self.hash_up_to(
             accumulators[-1][1]['value'],
-            self.subtrees[accumulators[-1][0]].get_bitmap(min_level=hash_bit_size),
+            self.subtrees[accumulators[-1][0]].get_bitpath(min_level=hash_bit_size),
             accumulators[-1][1]['level'],
             hash_bit_size,
         )
 
-    def prove_excluded(self, leaf: bytes):
-        """Exclusion proofs: find first intersection; show actual values
-            at that place and complete proof up to root; neither actual
-            value is calculated from the leaf; therefore the leaf is not
-            part of the tree.
+        assert root == self.root, \
+            f"Root calculation failed:\nExpected {self.root.hex()}\nGot {root.hex()}"
+
+    def prove_excluded(self, leaf: bytes) -> bytes:
+        """Exclusion proofs: find first intersection with bitpath path;
+            hash an empty node up to the intersection; then hash up to
+            the root. The verification will show that the position the
+            leaf would have taken is empty, and therefore the leaf is
+            not included in the tree. Returns a proof as VM bytecode.
         """
         ...
 
@@ -328,10 +363,10 @@ class SparseTree:
     def unpack(cls, data: bytes, /, *, inject: dict = {}) -> SparseTree:
         """Deserialize from bytes."""
         dependencies = {**globals(), **inject}
-        subtrees = deserialize_part(data)
+        subtrees = deserialize_part(data, inject=dependencies)
         return cls(
             subtrees=subtrees,
         )
 
     def __eq__(self, other) -> bool:
-        return type(self) is type(other) and self.subtrees == other.subtrees
+        return isinstance(other, SparseTree) and self.root == other.root
