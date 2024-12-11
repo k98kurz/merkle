@@ -9,6 +9,7 @@ from .vm import (
     get_empty_hash,
     hash_leaf,
     hash_node,
+    compile,
 )
 
 
@@ -28,12 +29,28 @@ def get_bitpath(data: bytes) -> list[bool]:
         ])
     return bitpath
 
+def calculate_intersection(hash1: bytes|int, hash2: bytes|int) -> int:
+    """Calculate the intersection point of two hashes. Since the SMT is
+        a balanced binary tree, the intersection point is the first bit
+        that is different between the two hashes.
+    """
+    idx1 = int.from_bytes(hash1, 'big') if isinstance(hash1, bytes) else hash1
+    idx2 = int.from_bytes(hash2, 'big') if isinstance(hash2, bytes) else hash2
+    if idx1 == idx2:
+        return 0
+    return (idx1^idx2).bit_length()
+
 
 @dataclass
 class SparseSubTree:
     leaf: bytes = field()
     level: int = field()
     _root: bytes = field(default=None)
+    _bitpath: list[bool] = field(default=None)
+
+    @property
+    def leaf_hash(self) -> bytes:
+        return hash_leaf(self.leaf)
 
     def get_bitpath(self, min_level: int = 8) -> list[bool]:
         """Gets the path from leaf to root for the leaf. Assumes
@@ -47,39 +64,28 @@ class SparseSubTree:
             calculate the intersection point of two sparse subtrees to
             join them into a single subtree.
         """
-        leaf_hash = hash_leaf(self.leaf)
-        bitpath = []
-        for i in range(max(ceil(self.level/8), ceil(min_level/8), 1)):
-            bitpath.extend([
-                0b10000000 & leaf_hash[i] != 0,
-                0b01000000 & leaf_hash[i] != 0,
-                0b00100000 & leaf_hash[i] != 0,
-                0b00010000 & leaf_hash[i] != 0,
-                0b00001000 & leaf_hash[i] != 0,
-                0b00000100 & leaf_hash[i] != 0,
-                0b00000010 & leaf_hash[i] != 0,
-                0b00000001 & leaf_hash[i] != 0,
-            ])
-        return bitpath
-
-    @staticmethod
-    def calculate_intersection(bm1: list[bool], bm2: list[bool]) -> int:
-        """Calculate the intersection point of two sparse subtrees,
-            using the bitpaths bm1 and bm2. Returns the level at which
-            the two subtrees intersect/diverge, calculated by traversing
-            the bitpaths from the most significant bit to the least
-            significant bit and finding the first bit that is different.
-        """
-        for level in range(min(len(bm1), len(bm2))):
-            if bm1[level] != bm2[level]:
-                return level
-        return min(len(bm1), len(bm2))
+        if self._bitpath is None:
+            leaf_hash = hash_leaf(self.leaf)
+            bitpath = []
+            for i in range(max(ceil(self.level/8), ceil(min_level/8), 1)):
+                bitpath.extend([
+                    0b10000000 & leaf_hash[i] != 0,
+                    0b01000000 & leaf_hash[i] != 0,
+                    0b00100000 & leaf_hash[i] != 0,
+                    0b00010000 & leaf_hash[i] != 0,
+                    0b00001000 & leaf_hash[i] != 0,
+                    0b00000100 & leaf_hash[i] != 0,
+                    0b00000010 & leaf_hash[i] != 0,
+                    0b00000001 & leaf_hash[i] != 0,
+                ])
+            self._bitpath = bitpath
+        return self._bitpath
 
     def intersection_level(self, other: SparseSubTree) -> int:
         """Calculate the intersection level of two sparse subtrees."""
-        bm1 = self.get_bitpath()
-        bm2 = other.get_bitpath()
-        return self.calculate_intersection(bm1, bm2)
+        hash1 = hash_leaf(self.leaf)
+        hash2 = hash_leaf(other.leaf)
+        return calculate_intersection(hash1, hash2)
 
     def prove(self) -> list[tuple[bytes|OpCodes|int,]]:
         """Create an inclusion proof for this SpareSubTree."""
@@ -280,71 +286,69 @@ class SparseTree:
         """Prove leaf inclusion. Returns a proof as VM bytecode."""
         tressa(leaf in [t.leaf for t in self.subtrees], 'unrecognized leaf')
 
-        subtree = [t for t in self.subtrees if t.leaf == leaf][0]
-        proof = subtree.prove()
-        hash_bit_size = len(proof[-1][1])*8
-        full_path = subtree.get_bitpath(min_level=hash_bit_size)
+        # Get the target subtree and its index
+        subtree_index = next(i for i, t in enumerate(self.subtrees) if t.leaf == leaf)
+        subtree = self.subtrees[subtree_index]
 
-        if not full_path[subtree.level]:
-            proof.insert(0, bytes(OpCodes.subroutine_left))
+        # Get the full path from leaf to root
+        bitpath = subtree.get_bitpath()
+
+        # Start with the leaf's proof as a subroutine based on path direction
+        initial_proof = compile(*subtree.prove())
+        proof = []
+
+        if not bitpath[subtree.level]:
+            proof.extend([
+                (OpCodes.subroutine_left, initial_proof)
+            ])
         else:
-            proof.insert(0, bytes(OpCodes.subroutine_right))
+            proof.extend([
+                (OpCodes.subroutine_right, initial_proof)
+            ])
 
-        accumulators = {
-            i: {
-                'level': self.subtrees[i].level,
-                'value': self.subtrees[i].root(),
-            }
-            for i,_ in self.treemap.items()
-        }
-        intersections = [
-            (k, v[1], v[0])
-            for k, v in self.treemap.items()
-        ]
+        # Find all intersections involving this subtree, sorted by level
+        relevant_intersections = []
+        for i, other_index in self.treemap.items():
+            if i == subtree_index:
+                level, other_subtree = other_index
+                relevant_intersections.append((level, other_subtree))
+            elif other_index[1] == subtree_index:
+                level = other_index[0]
+                relevant_intersections.append((level, i))
 
-        for nt in intersections:
-            i, j, level = nt
-            if self.treemap[i] != [level, j]:
-                continue
-            if accumulators[i]['level'] < level:
-                accumulators[i]['value'] = self.hash_up_to(
-                    accumulators[i]['value'],
-                    self.subtrees[i].get_bitpath(),
-                    accumulators[i]['level'],
+        relevant_intersections.sort(key=lambda x: x[0])
+
+        # For each intersection level, add the sibling hash to the proof
+        for level, other_index in relevant_intersections:
+            other_subtree: SparseSubTree = self.subtrees[other_index]
+
+            # Hash up the other subtree to the intersection level
+            if other_subtree.level < level:
+                other_value = self.hash_up_to(
+                    other_value,
+                    other_subtree.get_bitpath(),
+                    other_subtree.level,
                     level
-                )
-            if accumulators[j]['level'] < level:
-                accumulators[j]['value'] = self.hash_up_to(
-                    accumulators[j]['value'],
-                    self.subtrees[j].get_bitpath(),
-                    accumulators[j]['level'],
-                    level
-                )
-            go_left = not self.subtrees[i].get_bitpath()[self.subtrees[i].level]
-            if go_left:
-                accumulators[i]['value'] = hash_node(
-                    accumulators[i]['value'],
-                    accumulators[j]['value'],
                 )
             else:
-                accumulators[i]['value'] = hash_node(
-                    accumulators[j]['value'],
-                    accumulators[i]['value'],
-                )
+                other_value = other_subtree.root()
 
-        accumulators = [(k, v) for k,v in accumulators.items()]
-        accumulators.sort(key=lambda a: a[1]['level'], reverse=True)
-        hash_bit_size = len(accumulators[0][1]['value'])*8
+            # Add the sibling hash to the proof based on path direction
+            if not bitpath[level]:
+                proof.extend([
+                    (OpCodes.load_right, other_value),
+                    (OpCodes.hash_right,)
+                ])
+            else:
+                proof.extend([
+                    (OpCodes.load_left, other_value),
+                    (OpCodes.hash_left,)
+                ])
 
-        root = self.hash_up_to(
-            accumulators[-1][1]['value'],
-            self.subtrees[accumulators[-1][0]].get_bitpath(min_level=hash_bit_size),
-            accumulators[-1][1]['level'],
-            hash_bit_size,
-        )
+        # Add final root verification
+        proof.append((OpCodes.hash_final_hsize, self.root))
 
-        assert root == self.root, \
-            f"Root calculation failed:\nExpected {self.root.hex()}\nGot {root.hex()}"
+        return compile(*proof)
 
     def prove_excluded(self, leaf: bytes) -> bytes:
         """Exclusion proofs: find first intersection with bitpath path;

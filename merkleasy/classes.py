@@ -1,6 +1,5 @@
 from __future__ import annotations
 from .errors import tert, eruces, vert, SecurityError
-from .sparse import SparseSubTree, SparseTree
 from .vm import (
     _HASH_FUNCTION,
     get_hash_function,

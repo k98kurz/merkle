@@ -7,4 +7,5 @@ from merkleasy import classes
 from merkleasy import errors
 from merkleasy import interfaces
 from merkleasy import serialization
+from merkleasy import sparse
 from merkleasy import vm
