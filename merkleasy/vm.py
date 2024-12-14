@@ -916,6 +916,53 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int,]) -> tuple[bytes,
     return (code, 1)
 
 
+def decompile(code: bytes) -> list[OpCodes|bytes|int]:
+    """Decompiles bytecode into a list of OpCodes, bytes, and ints."""
+    proof = []
+    index = 0
+    hsize = 32
+    while index < len(code):
+        op = OpCodes(code[index])
+        proof.append(op)
+        index += 1
+
+        if op is OpCodes.set_hsize:
+            hsize = code[index]
+            proof.append(hsize)
+            index += 1
+        elif op in _advance_['op bytes']:
+            proof.append(code[index:index+hsize])
+            index += hsize
+        elif op in _advance_['op u8 bytes']:
+            size = code[index]
+            proof.append(code[index+1:index+1+size])
+            index += 1 + size
+        elif op in _advance_['op u16 bytes']:
+            size = int.from_bytes(code[index:index+2], 'big')
+            proof.append(code[index+2:index+2+size])
+            index += 2 + size
+        elif op in _advance_['op u8 u8 bytes']:
+            first = code[index]
+            second = code[index+1]
+            proof.extend([
+                first,
+                second,
+                code[index+2:index+2+hsize]
+            ])
+            index += 2 + hsize
+        elif op in _advance_['op u8 u8']:
+            first = code[index]
+            second = code[index+1]
+            proof.extend([
+                first,
+                second,
+            ])
+            index += 2
+        elif op in _advance_['op u8']:
+            proof.append(code[index])
+            index += 1
+    return proof
+
 def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
     """Adapts a proof from the legacy code into bytecode."""
     tert(all([type(step) is bytes for step in proof]),
