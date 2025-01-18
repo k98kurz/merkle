@@ -7,6 +7,7 @@ from .vm import (
     VirtualMachine,
     OpCodes,
     compile,
+    decompile,
     adapt_legacy_proof,
     hash_node,
     hash_leaf,
@@ -192,7 +193,9 @@ class Tree:
     def verify(root: bytes, leaf: bytes, proof: bytes|list[bytes],
                report_errors: bool = False
     ) -> bool|tuple[bool, list[BaseException,]]:
-        """Verify an inclusion proof is valid. Returns status and errors."""
+        """Verify an inclusion proof is valid. If report_errors is True,
+            returns status and errors. Otherwise, returns status.
+        """
         # preconditions
         tert(type(root) is bytes, 'root must be bytes')
         tert(type(leaf) is bytes, 'leaf must be bytes')
@@ -201,10 +204,16 @@ class Tree:
         if type(proof) is list:
             proof = adapt_legacy_proof(proof)
 
+        try:
+            decompiled = decompile(proof)
+        except Exception as e:
+            if report_errors:
+                return (False, (e,))
+            return False
+
         leaf_hash = hash_leaf(leaf)
-        leaf_size = min(len(leaf) + 3, len(proof))
-        leaf_hash_size = min(len(leaf_hash) + 3, len(proof))
-        if leaf not in proof[:leaf_size] and leaf_hash not in proof[:leaf_hash_size]:
+        index = 3 if decompiled[0] is OpCodes.set_hsize else 1
+        if decompiled[index] not in (leaf, leaf_hash):
             if report_errors:
                 return (False, (SecurityError('proof does not reference leaf'),))
             return False
@@ -233,7 +242,8 @@ def _join(parts: list[bytes|Tree]) -> list[Tree]:
 
     return new_parts
 
-def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True) -> list[tuple[Tree, Tree|None, tuple[int,]]]:
+def _traverse(branch: Tree, history: tuple[int], exclude_root: bool = True
+              ) -> list[tuple[Tree, Tree|None, tuple[int,]]]:
     """Returns form [(hash, parent, history),...]."""
     nodes = []
     if not exclude_root:
