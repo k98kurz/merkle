@@ -9,3 +9,4 @@ from merkleasy import interfaces
 from merkleasy import serialization
 from merkleasy import sparse
 from merkleasy import vm
+from merkleasy import xorhashtree
