@@ -39,7 +39,7 @@ class TestMerkle(unittest.TestCase):
         assert tree.right == right_hash
         assert tree.root == root
 
-    def test_Tree_from_leaves_tressas_at_least_two_leaves(self):
+    def test_Tree_from_leaves_requires_at_least_two_leaves(self):
         with self.assertRaises(ValueError) as e:
             classes.Tree.from_leaves([b'123'])
         assert str(e.exception) == 'must have at least 2 leaves'
