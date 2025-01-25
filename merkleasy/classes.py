@@ -34,6 +34,7 @@ class Tree:
 
     @parent.setter
     def parent(self, parent) -> None:
+        """Set the parent. Raises `TypeError` upon invalid input."""
         tert(isinstance(parent, Tree) or parent is None, 'invalid parent')
         self._parent = parent
 
@@ -54,7 +55,9 @@ class Tree:
         return self._right_bytes
 
     def __init__(self, left: Tree | bytes, right: Tree | bytes) -> None:
-        """Set the left, right, and calculated root."""
+        """Set the left, right, and calculated root. Raises `TypeError`
+            upon invalid input.
+        """
         tert(type(left) in (Tree, bytes, bytearray),
             'left must be one of Tree, bytes, bytearray')
         tert(type(right) in (Tree, bytes, bytearray),
@@ -106,7 +109,9 @@ class Tree:
 
     @classmethod
     def from_leaves(cls, leaves: list[bytes]) -> Tree:
-        """Return a full Tree constructed from the leaves."""
+        """Return a full Tree constructed from the leaves. Raises
+            `TypeError` or `ValueError` upon invalid input.
+        """
         tert(type(leaves) in (tuple, list), 'leaves must be tuple or list of bytes')
         vert(len(leaves) >= 2, 'must have at least 2 leaves')
 
@@ -124,7 +129,10 @@ class Tree:
 
     @classmethod
     def from_dict(cls, data: dict) -> Tree:
-        """Deserialize from a dict and return an instance."""
+        """Deserialize from a dict and return an instance. Raises
+            `TypeError`, `ValueError`, or `SecurityError` if the dict
+            does not encode a valid `Tree` instance.
+        """
         tert(type(data) is dict, 'data must be dict type')
         vert(len(data.keys()) == 1, 'data must have one key')
         root = list(data.keys())[0]
@@ -140,12 +148,17 @@ class Tree:
 
     @classmethod
     def from_json(cls, data: str) -> Tree:
-        """Deserialize from json and return an instance."""
+        """Deserialize from json and return an instance. Raises
+            `json.decoder.JSONDecodeError` upon invalid input. Raises
+            `TypeError`, `ValueError`, or `SecurityError` if the JSON
+            does not encode a valid `Tree` instance.
+        """
         return cls.from_dict(json.loads(data))
 
     def prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]:
         """Create an inclusion proof for a leaf. Use verbose=True to add
-            hash checks at each tree level.
+            hash checks at each tree level. Raises `TypeError` or
+            `ValueError` upon invalid input.
         """
         tert(type(leaf) is bytes, 'leaf must be bytes')
         leaf_hash = hash_leaf(leaf)
@@ -194,7 +207,8 @@ class Tree:
                report_errors: bool = False
     ) -> bool|tuple[bool, list[BaseException,]]:
         """Verify an inclusion proof is valid. If report_errors is True,
-            returns status and errors. Otherwise, returns status.
+            returns status and errors. Otherwise, returns status. Raises
+            `TypeError` or `ValueError` upon invalid input.
         """
         # preconditions
         tert(type(root) is bytes, 'root must be bytes')

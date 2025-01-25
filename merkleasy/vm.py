@@ -9,8 +9,12 @@ from typing import Callable
 _HASH_FUNCTION = lambda input: sha256(input).digest()
 
 def set_hash_function(hash_function: Callable[[bytes], bytes]) -> None:
-    if not callable(hash_function):
-        raise ImplementationError('hash_function must be callable')
+    """Sets the hash function to be used by the VM. Raises
+        TypeError if the hash function is not callable or
+        ImplementationError if the hash function returns a non-bytes
+        value when called.
+    """
+    tert(callable(hash_function), 'hash_function must be callable')
     try:
         output = hash_function(b'test')
         if not type(output) is bytes:
@@ -21,12 +25,15 @@ def set_hash_function(hash_function: Callable[[bytes], bytes]) -> None:
         raise ImplementationError(f'hash_function execution failed with {e}')
 
 def get_hash_function() -> Callable[[bytes], bytes]:
+    """Returns the hash function currently being used by the VM."""
     return _HASH_FUNCTION
 
 def hash_leaf(data: bytes) -> bytes:
+    """Hashes a leaf node."""
     return get_hash_function()(b'\x00' + data)
 
 def hash_node(left: bytes, right: bytes) -> bytes:
+    """Hashes an internal node."""
     return get_hash_function()(b'\x01' + left + right)
 
 def xor(b1: bytes, b2: bytes) -> bytes:
@@ -964,7 +971,9 @@ def decompile(code: bytes) -> list[OpCodes|bytes|int]:
     return proof
 
 def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
-    """Adapts a proof from the legacy code into bytecode."""
+    """Adapts a proof from the legacy code into bytecode. Raises
+        `TypeError` or `ValueError` upon invalid input.
+    """
     tert(all([type(step) is bytes for step in proof]),
            'proof must be bytes or list of bytes')
     return OpCodes.set_hsize.value.to_bytes(1, 'big') + \

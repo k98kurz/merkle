@@ -12,14 +12,11 @@ several registers: left, right, path, bit, final, size, and return.
 
 # Status
 
-- [x] Tests
-- [x] Implementation
-- [x] Proofs
-- [x] Usage Documentation
-- [x] Publish to pypi
-- [x] Replace proof verification with register machine (backwards compatible)
-- [ ] Add hash-XOR tree (Xree) -- extend VM
-- [ ] Sparse Merkle trees and exclusion proofs
+Open issues planned for future releases can be found
+[here](https://github.com/k98kurz/merkle/issues?q=is%3Aissue%20state%3Aopen%20label%3Aplanned).
+Historical changes can be found in the
+[changelog](https://github.com/k98kurz/merkle/blob/master/changelog.md).
+
 
 # Installation
 
@@ -36,7 +33,6 @@ To develop or test, fork or clone the repo and install the dependency.
 ```bash
 python -m venv venv/
 source venv/Scripts/activate
-pip install pycelium-specifications==0.0.2.2
 ```
 
 ## *nix Setup
@@ -44,23 +40,17 @@ pip install pycelium-specifications==0.0.2.2
 ```bash
 python -m venv venv/
 source venv/bin/activate
-pip install pycelium-specifications==0.0.2.2
 ```
 
 ## Running Tests
 
 There are several test files. Run them with the following:
 
-```bash
-find tests -name test_*.py -printf "%p" -exec python {} \;
-```
-
-Alternately, for non-POSIX systems, run the following:
 ```
 python tests/test_classes.py
 python tests/test_sparse.py
-python tests/test_specification.py
 python tests/test_vm.py
+python tests/test_xorhashtree.py
 ```
 
 These files demonstrate all the intended behaviors of the class and rule out
@@ -69,20 +59,31 @@ that the test suite is thorough. The tests are also a form of technical
 documentation; any questions about the code can likely be answered by reading
 through them.
 
+There are several additional test files that are a combination of an unfinished
+feature and leftovers from an old project that requires updates. Once those are
+resolved, this notice will be removed.
+
 # Classes
 
 - `ImplementationError(BaseException)`
 - `UsagePreconditionError(BaseException)`
 - `SecurityError(BaseException)`
 - `Tree`
+- `XorHashTree`
+- `VirtualMachine`
+- `OpCodes`
 
-The Usage section describes for each method/function which (if any) of these
-errors it can raise.
+The Usage section describes for each method/function which (if any) errors it
+can raise.
 
 # Functions and Methods
 
 - `set_hash_function(hash_function: Callable[[bytes], bytes]) -> None`
 - `get_hash_function() -> Callable`
+- `compile(proof: list[bytes]) -> bytes`
+- `decompile(proof: bytes) -> list[bytes]`
+- `hash_node(left: bytes, right: bytes) -> bytes`
+- `hash_leaf(leaf: bytes) -> bytes`
 
 ## Tree
 
@@ -99,9 +100,27 @@ errors it can raise.
 - `prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]`
 - `@staticmethod verify(root: bytes, leaf: bytes, proof: list[bytes]) -> None`
 
+## XorHashTree
+
+- `__init__(self, left: XorHashTree | bytes, right: XorHashTree | bytes) -> None`
+- `__str__(self) -> str`
+- `__repr__(self) -> str`
+- `__eq__(self, other: object) -> bool`
+- `__hash__(self) -> int`
+- `to_dict(self) -> dict`
+- `to_json(self, pretty: bool = False) -> str`
+- `@classmethod from_leaves(cls, leaves: list[bytes]) -> XorHashTree`
+- `@classmethod from_dict(cls, data: dict) -> XorHashTree`
+- `@classmethod from_json(cls, data: str) -> XorHashTree`
+- `prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]`
+- `@staticmethod verify(root: bytes, leaf: bytes, proof: list[bytes]) -> None`
+
+
 # Usage
 
-Usage examples are shown below.
+Usage examples are shown below. The `Tree` class is a classic Merkle tree. The
+`XorHashTree` class is a variant of the `Tree` class that joins branches by
+XORing their hashes, but its use is practically identical to the `Tree` class.
 
 ## `Tree.from_leaves`
 
@@ -116,7 +135,7 @@ tree = Tree.from_leaves(leaves)
 
 Note that all leaves are hashed by the `from_leaves` method.
 
-Raises `UsagePreconditionError` upon invalid input.
+Raises `ValueError` or `TypeError` upon invalid input.
 
 ## `Tree.__init__`
 
@@ -145,7 +164,7 @@ tree = Tree(
 )
 ```
 
-Raises `UsagePreconditionError` upon invalid input.
+Raises `TypeError` upon invalid input.
 
 ## `Tree.to_dict` and `Tree.from_dict`
 
@@ -161,7 +180,7 @@ assert deserialized == tree
 ```
 
 `Tree.from_dict` raises any of the following upon invalid input:
-- `UsagePreconditionError`
+- `TypeError`
 - `ValueError`
 - `SecurityError`
 
@@ -181,7 +200,7 @@ assert deserialized == Tree.from_json(pretty)
 
 `Tree.from_json` raises any of the following upon invalid input:
 - `json.decoder.JSONDecodeError`
-- `UsagePreconditionError`
+- `TypeError`
 - `ValueError`
 - `SecurityError`
 
@@ -207,72 +226,69 @@ functionality exists as a side-effect of preventing malicious proofs from
 tricking the validator -- `test_Tree_verify_does_not_validate_malicious_proof`
 contains an example attack.
 
-Raises `UsagePreconditionError` upon invalid input.
+Raises `TypeError` or `ValueError` upon invalid input.
 
 ## `Tree.verify`
 
 Inclusion proofs can be verified using `Tree.verify`:
 
 ```py
-from merkleasy import Tree, UsagePreconditionError, SecurityError
+from merkleasy import Tree, SecurityError
 
 tree = Tree.from_leaves([b'leaf1', b'leaf2', b'leaf3'])
 leaf = b'leaf1'
 proof1 = tree.prove(leaf)
 proof2 = tree.prove(b'leaf2')
 
+# Example 1: type error
 try:
-    Tree.verify(tree.root, leaf, proof1)
+    if Tree.verify('some string', leaf, proof1):
+        print(f'verified proof {[p.hex() for p in proof1]} for {leaf=}')
+    else:
+        print(f'proof {[p.hex() for p in proof1]} for {leaf=} is invalid')
+except TypeError as e:
+    # expected result
+    print(f'invalid type supplied as an input: {e}')
+
+
+# Example 2: valid proof
+if Tree.verify(tree.root, leaf, proof1):
     # expected result
     print(f'verified proof {[p.hex() for p in proof1]} for {leaf=}')
-except UsagePreconditionError as e:
-    print(f'invalid use of library: {e}')
-except ValueError as e:
-    print(f'invalid proof supplied: {e}')
-except SecurityError as e:
-    print(f'error encountered: {e}')
+else:
+    print(f'proof {[p.hex() for p in proof1]} for {leaf=} is invalid')
 
-try:
-    Tree.verify('some string', leaf, proof1)
-    print(f'verified proof {[p.hex() for p in proof1]} for {leaf=}')
-except UsagePreconditionError as e:
-    # expected result
-    print(f'invalid use of library: {e}')
-except ValueError as e:
-    print(f'invalid proof supplied: {e}')
-except SecurityError as e:
-    print(f'error encountered: {e}')
 
-try:
-    Tree.verify(tree.root, leaf, [b'\x99', *proof2])
+# Example 3: invalid (malformed) proof
+result = Tree.verify(tree.root, leaf, [(b'\x99',), *proof2], report_errors=True)
+if result[0]:
     print(f'verified proof {[p.hex() for p in proof2]} for {leaf=}')
-except UsagePreconditionError as e:
-    print(f'invalid use of library: {e}')
-except ValueError as e:
+else:
     # expected result
-    print(f'invalid proof supplied: {e}')
-except SecurityError as e:
-    print(f'error encountered: {e}')
+    print(f'errors encountered: {result[1]}')
+    assert type(result[1][0]) is ValueError
+    # note that for XorHashTree, the error type will be SyntaxError
 
-try:
-    Tree.verify(tree.root, leaf, proof2)
+
+# Example 4: invalid proof (wrong leaf)
+result = Tree.verify(tree.root, leaf, proof2, report_errors=True)
+if result[0]:
     print(f'verified proof {[p.hex() for p in proof2]} for {leaf=}')
-except UsagePreconditionError as e:
-    print(f'invalid use of library: {e}')
-except ValueError as e:
-    print(f'invalid proof supplied: {e}')
-except SecurityError as e:
+else:
     # expected result
-    print(f'error encountered: {e}')
+    print(f'errors encountered: {result[1]}')
+    assert type(result[1][0]) is SecurityError
 ```
 
 This static method parses the proof, interpreting the first byte in each proof
-step as a code from `interfaces.ProofOp`. It ensures that the proof starts with
+step as a code from `vm.OpCodes`. It ensures that the proof starts with
 the leaf and ends with the root, and then it follows the proof operations.
 
-Raises `UsagePreconditionError` or `ValueError` when provided invalid parameters.
-Raises `SecurityError` when provided an invalid proof. If all checks pass, it
-executes without error and returns `None`.
+Raises `TypeError` when provided invalid parameters. If all type checks pass, it
+executes without error and returns `True` or `False`. If `report_errors` is set
+to `True`, then it returns a tuple of `(status, errors)`, and those errors will
+be those encountered by the virtual machine while attempting to execute the
+proof.
 
 ## `get_hash_function`
 
@@ -339,7 +355,9 @@ tree2 = alt_create_tree(leaves)
 assert tree1 != tree2
 ```
 
-# Security / Usage Note
+# Security / Usage Notes
+
+## Second-preimage attack
 
 Any application/library that uses this package should use a schema for leaves
 that is anything except exactly 32 bytes. This prevents the second-preimage
@@ -349,25 +367,33 @@ could actually become a serious security issue, but it is worth keeping in mind
 during application development.
 
 So in addition to verifying an inclusion proof, verify that the data fits the
-leaf schema. Preferably, leaf schema should not be bytes, and a serializer to
-bytes from the schema should be used on the leaf before verifying the inclusion
-proof.
+leaf schema. For example, leaf schema could be non-bytes, and a serializer to
+bytes from the schema could be used on the leaf before verifying the inclusion
+proof. Another option is to hash each leaf and prepend any arbitrary byte to
+make each leaf 33 bytes long, allowing for the hash to be verified as a leaf
+without requiring the full leaf, which will maintain concise proofs.
+
+## Mirror trees (`XorHashTree`)
+
+All `XorHashTree`s with identical left and right branches ("mirror trees") will
+have the same root, regardless of what those branches are, which means that
+inclusion of any arbitrary branch can be proved for any mirror tree. This is
+because xor(left, right) == 0 when left == right. If you use `XorHashTree`
+mirror trees, they will be exploitable. This is not the case for the basic
+Merkle `Tree` class. If checking to ensure that mirror trees are not created
+within an application is not desirable, use the `Tree` class instead.
+
+(This package does not generate an error when a mirror tree is created becase it
+may have uses in some niche scenarios.)
 
 # ISC License
 
-Copyleft (c) 2023 k98kurz
+Copyleft (c) 2025 Jonathan Voss (k98kurz)
 
 Permission to use, copy, modify, and/or distribute this software
 for any purpose with or without fee is hereby granted, provided
 that the above copyleft notice and this permission notice appear in
 all copies.
-
-Exceptions: this permission is not granted to Alphabet/Google, Amazon,
-Apple, Microsoft, Netflix, Meta/Facebook, Twitter, or Disney; nor is
-permission granted to any company that contracts to supply weapons or
-logistics to any national military; nor is permission granted to any
-national government or governmental agency; nor is permission granted to
-any employees, associates, or affiliates of these designated entities.
 
 THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
 WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
