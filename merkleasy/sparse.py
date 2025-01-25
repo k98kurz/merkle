@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from math import ceil
-from .errors import tressa
+from .errors import vert
 from .serialization import serialize_part, deserialize_part
 from .vm import (
     OpCode,
@@ -284,7 +284,7 @@ class SparseTree:
 
     def prove(self, leaf: bytes) -> bytes:
         """Prove leaf inclusion. Returns a proof as VM bytecode."""
-        tressa(leaf in [t.leaf for t in self.subtrees], 'unrecognized leaf')
+        vert(leaf in [t.leaf for t in self.subtrees], 'unrecognized leaf')
 
         # Get the target subtree and its index
         subtree_index = next(i for i, t in enumerate(self.subtrees) if t.leaf == leaf)

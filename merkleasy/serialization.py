@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .errors import tressa
+from .errors import tert
 from .interfaces import PackableProtocol
 from typing import Any
 import struct
@@ -9,7 +9,7 @@ def serialize_part(data: Any) -> bytes:
     """Serializes an instance of a PackableProtocol implementation or
         built-in type, recursively calling itself as necessary.
     """
-    tressa(isinstance(data, PackableProtocol) or \
+    tert(isinstance(data, PackableProtocol) or \
         type(data) in (list, set, tuple, str, bytes, bytearray, int, float) or \
             data is None,
         'data type must be one of (PackableProtocol, list, set, tuple, ' + \
@@ -93,9 +93,9 @@ def deserialize_part(data: bytes, inject: dict = {}) -> Any:
         packed, _ = struct.unpack(f'!{packed_len}s{len(data)-packed_len}s', data)
         packed_class, _, packed_data = packed.partition(b'_')
         packed_class = str(bytes.fromhex(str(packed_class, 'utf-8')), 'utf-8')
-        tressa(packed_class in dependencies,
+        tert(packed_class in dependencies,
             f'{packed_class} not found in globals or inject; cannot unpack')
-        tressa(hasattr(dependencies[packed_class], 'unpack'),
+        tert(hasattr(dependencies[packed_class], 'unpack'),
             f'{packed_class} must have unpack method')
         return dependencies[packed_class].unpack(packed_data, inject=inject)
 
