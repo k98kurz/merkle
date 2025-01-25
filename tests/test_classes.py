@@ -1,5 +1,5 @@
 from context import classes, errors, vm
-from hashlib import sha256, sha3_256
+from hashlib import sha256, sha3_256, shake_256
 from random import randint
 import unittest
 
@@ -281,7 +281,7 @@ class TestMerkle(unittest.TestCase):
         assert classes.Tree.verify(tree.root, attack_leaf, vm.compile(*attack_proof))
 
     def test_e2e_arbitrary_branching(self):
-        leaves = [sha256(n.to_bytes(2, 'big')).digest() for n in range(13)]
+        leaves = [n.to_bytes(2, 'big') for n in range(13)]
 
         tree = classes.Tree(leaves[0], leaves[1])
         for i in range(2, len(leaves)):
@@ -295,6 +295,14 @@ class TestMerkle(unittest.TestCase):
         proof2 = tree.prove(leaf, verbose=True)
         classes.Tree.verify(tree.root, leaf, proof1)
         classes.Tree.verify(tree.root, leaf, proof2)
+
+    def test_e2e_alternate_hash_size(self):
+        classes.set_hash_function(lambda preimage: shake_256(preimage).digest(24))
+        leaves = [n.to_bytes(2, 'big') for n in range(13)]
+        tree = classes.Tree.from_leaves(leaves)
+        leaf = leaves[randint(0, len(leaves)-1)]
+        proof = tree.prove(leaf)
+        assert classes.Tree.verify(tree.root, leaf, proof)
 
 
 if __name__ == '__main__':

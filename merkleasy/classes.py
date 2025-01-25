@@ -210,6 +210,9 @@ class Tree:
                 node = [n for n in nodes if n[0] == new_node.root][0]
         proof = [*proof[1:], compile(OpCode.hash_final_hsize, self.root)]
 
+        if len(leaf_hash) != 32:
+            proof = [compile(OpCode.set_hsize, len(leaf_hash)), *proof]
+
         return b''.join(proof)
 
     @staticmethod

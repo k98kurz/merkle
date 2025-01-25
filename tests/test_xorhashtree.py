@@ -1,11 +1,17 @@
 from context import errors, xorhashtree, vm
-from hashlib import sha256
+from hashlib import sha256, shake_256
 from random import randint
 import unittest
 
 
 class TestXorHashTree(unittest.TestCase):
     """Test suite for the XorHashTree class."""
+    def setUp(self) -> None:
+        self.original_hash_function = vm.get_hash_function()
+
+    def tearDown(self) -> None:
+        vm.set_hash_function(self.original_hash_function)
+
     def hash(self, data: bytes) -> bytes:
         return sha256(data).digest()
 
@@ -287,6 +293,14 @@ class TestXorHashTree(unittest.TestCase):
         proof2 = tree.prove(leaf, verbose=True)
         xorhashtree.XorHashTree.verify(tree.root, leaf, proof1)
         xorhashtree.XorHashTree.verify(tree.root, leaf, proof2)
+
+    def test_e2e_alternate_hash_size(self):
+        vm.set_hash_function(lambda preimage: shake_256(preimage).digest(24))
+        leaves = [n.to_bytes(2, 'big') for n in range(13)]
+        tree = xorhashtree.XorHashTree.from_leaves(leaves)
+        leaf = leaves[randint(0, len(leaves)-1)]
+        proof = tree.prove(leaf)
+        assert xorhashtree.XorHashTree.verify(tree.root, leaf, proof)
 
     def test_prove_all_mirror_XorHashTrees_share_same_root(self):
         """Potential security issue that must be noted: all trees that

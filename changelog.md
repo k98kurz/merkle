@@ -1,3 +1,9 @@
+# 0.1.2
+
+- More documentation corrections.
+- Fixed bug where hsize was not being set for proofs when alternate hash
+function (with digest length other than 32) was used.
+
 # 0.1.1
 
 - Corrected some documentation.

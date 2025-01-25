@@ -931,7 +931,7 @@ def _compile_next(index: int, symbols: list[OpCode|bytes|int,]) -> tuple[bytes, 
     return (code, 1)
 
 
-def decompile(code: bytes) -> list[OpCode|bytes|int]:
+def decompile(code: bytes) -> list[OpCode|bytes|int,]:
     """Decompiles bytecode into a list of OpCode, bytes, and ints."""
     proof = []
     index = 0

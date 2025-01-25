@@ -202,6 +202,9 @@ class XorHashTree:
 
         proof.append((OpCode.hash_xor_final, self.root))
 
+        if len(leaf_hash) != 32:
+            proof = [OpCode.set_hsize, len(leaf_hash), *proof]
+
         return compile(*proof)
 
     @staticmethod

@@ -2,7 +2,7 @@
 
 Merkleasy is a Python library for Merkle Trees. It consists of a virtual
 machine, a Tree class, an XorHashTree class, and a set of miscellaneous
-functions and other classes. Version 0.1.1.
+functions and other classes. Version 0.1.2.
 
 ## Classes
 
@@ -233,7 +233,7 @@ Returns the hash function currently being used by the VM.
 Compiles a list of OpCode, bytes, and ints into byte code. Raises SyntaxError
 for invalid VM code syntax. Raises TypeError for invalid symbols.
 
-### `decompile(code: bytes) -> list[OpCode | bytes | int]:`
+### `decompile(code: bytes) -> list[OpCode | bytes | int,]:`
 
 Decompiles bytecode into a list of OpCode, bytes, and ints.
 
