@@ -262,6 +262,24 @@ class TestMerkle(unittest.TestCase):
         assert type(result[1][0]) is errors.SecurityError
         assert str(result[1][0]) == 'proof does not reference root'
 
+    def test_Tree_is_vulnerable_to_second_preimage_attack(self):
+        leaves = [b'leaf0', b'leaf1', b'leaf2', b'leaf3']
+        tree = classes.Tree(
+            classes.Tree.from_leaves([leaves[0], leaves[1]]),
+            classes.Tree.from_leaves([leaves[2], leaves[3]])
+        )
+        leaf = leaves[3]
+
+        # normal proof
+        proof = tree.prove(leaf, verbose=True)
+        assert classes.Tree.verify(tree.root, leaf, proof)
+
+        # second preimage attack: prove an intermediate node is a leaf
+        proof = vm.decompile(proof)
+        attack_proof = proof[5:]
+        attack_leaf = attack_proof[1]
+        assert classes.Tree.verify(tree.root, attack_leaf, vm.compile(*attack_proof))
+
     def test_e2e_arbitrary_branching(self):
         leaves = [sha256(n.to_bytes(2, 'big')).digest() for n in range(13)]
 
