@@ -4,7 +4,7 @@ from math import ceil
 from .errors import tressa
 from .serialization import serialize_part, deserialize_part
 from .vm import (
-    OpCodes,
+    OpCode,
     VirtualMachine,
     get_empty_hash,
     hash_leaf,
@@ -87,46 +87,46 @@ class SparseSubTree:
         hash2 = hash_leaf(other.leaf)
         return calculate_intersection(hash1, hash2)
 
-    def prove(self) -> list[tuple[bytes|OpCodes|int,]]:
+    def prove(self) -> list[tuple[bytes|OpCode|int,]]:
         """Create an inclusion proof for this SpareSubTree."""
         leaf_hash = hash_leaf(self.leaf)
         bitpath = self.get_bitpath()
 
         proof = [
-            (OpCodes.set_hsize, len(leaf_hash)),
+            (OpCode.set_hsize, len(leaf_hash)),
         ]
         accumulated = leaf_hash
         if not bitpath[0]:
             proof.extend([
-                (OpCodes.load_left, self.leaf),
-                (OpCodes.hash_leaf_left,),
-                (OpCodes.load_empty_right, 0)
+                (OpCode.load_left, self.leaf),
+                (OpCode.hash_leaf_left,),
+                (OpCode.load_empty_right, 0)
             ])
             accumulated = hash_node(accumulated, get_empty_hash(0))
         else:
             proof.extend([
-                (OpCodes.load_right, self.leaf),
-                (OpCodes.hash_leaf_right,),
-                (OpCodes.load_empty_left, 0)
+                (OpCode.load_right, self.leaf),
+                (OpCode.hash_leaf_right,),
+                (OpCode.load_empty_left, 0)
             ])
             accumulated = hash_node(get_empty_hash(0), accumulated)
 
         for i in range(1, self.level):
             if bitpath[i]:
                 proof.extend([
-                    (OpCodes.hash_right,),
-                    (OpCodes.load_empty_left, i)
+                    (OpCode.hash_right,),
+                    (OpCode.load_empty_left, i)
                 ])
                 accumulated = hash_node(get_empty_hash(i), accumulated)
             else:
                 proof.extend([
-                    (OpCodes.hash_left,),
-                    (OpCodes.load_empty_right, i)
+                    (OpCode.hash_left,),
+                    (OpCode.load_empty_right, i)
                 ])
                 accumulated = hash_node(accumulated, get_empty_hash(i))
 
         proof.append(
-            (OpCodes.hash_final_hsize, accumulated)
+            (OpCode.hash_final_hsize, accumulated)
         )
 
         return proof
@@ -136,12 +136,12 @@ class SparseSubTree:
             subtree using a hash_to_level_ op.
         """
         path = [
-            bytes(OpCodes.load_left) + len(self.leaf).to_bytes(2, 'big') +
+            bytes(OpCode.load_left) + len(self.leaf).to_bytes(2, 'big') +
             self.leaf
         ]
-        path.append(bytes(OpCodes.hash_leaf_left))
-        path.append(bytes(OpCodes.set_path_auto))
-        path.append(bytes(OpCodes.hash_to_level_path) + b'\x00' +
+        path.append(bytes(OpCode.hash_leaf_left))
+        path.append(bytes(OpCode.set_path_auto))
+        path.append(bytes(OpCode.hash_to_level_path) + b'\x00' +
                      self.level.to_bytes(2, 'big'))
         return path
 
@@ -299,11 +299,11 @@ class SparseTree:
 
         if not bitpath[subtree.level]:
             proof.extend([
-                (OpCodes.subroutine_left, initial_proof)
+                (OpCode.subroutine_left, initial_proof)
             ])
         else:
             proof.extend([
-                (OpCodes.subroutine_right, initial_proof)
+                (OpCode.subroutine_right, initial_proof)
             ])
 
         # Find all intersections involving this subtree, sorted by level
@@ -336,17 +336,17 @@ class SparseTree:
             # Add the sibling hash to the proof based on path direction
             if not bitpath[level]:
                 proof.extend([
-                    (OpCodes.load_right, other_value),
-                    (OpCodes.hash_right,)
+                    (OpCode.load_right, other_value),
+                    (OpCode.hash_right,)
                 ])
             else:
                 proof.extend([
-                    (OpCodes.load_left, other_value),
-                    (OpCodes.hash_left,)
+                    (OpCode.load_left, other_value),
+                    (OpCode.hash_left,)
                 ])
 
         # Add final root verification
-        proof.append((OpCodes.hash_final_hsize, self.root))
+        proof.append((OpCode.hash_final_hsize, self.root))
 
         return compile(*proof)
 

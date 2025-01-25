@@ -141,28 +141,28 @@ class TestMerkle(unittest.TestCase):
         assert len(verbose) > len(proof)
 
         # normal proof
-        assert bytes(classes.OpCodes.load_left_hsize) in (proof[0][:1], proof[1][:1])
-        assert bytes(classes.OpCodes.load_right_hsize) in (proof[0][:1], proof[1][:1])
+        assert bytes(classes.OpCode.load_left_hsize) in (proof[0][:1], proof[1][:1])
+        assert bytes(classes.OpCode.load_right_hsize) in (proof[0][:1], proof[1][:1])
         assert proof[2][:1] in (
-            bytes(classes.OpCodes.hash_left),
-            bytes(classes.OpCodes.hash_right)
+            bytes(classes.OpCode.hash_left),
+            bytes(classes.OpCode.hash_right)
         )
-        if proof[2][:1] == bytes(classes.OpCodes.hash_left):
-            assert proof[3][:1] != bytes(classes.OpCodes.load_left_hsize)
+        if proof[2][:1] == bytes(classes.OpCode.hash_left):
+            assert proof[3][:1] != bytes(classes.OpCode.load_left_hsize)
         else:
-            assert proof[3][:1] != bytes(classes.OpCodes.load_right_hsize)
+            assert proof[3][:1] != bytes(classes.OpCode.load_right_hsize)
 
         # verbose proof
-        assert bytes(classes.OpCodes.load_left_hsize) in (verbose[0][:1], verbose[1][:1])
-        assert bytes(classes.OpCodes.load_right_hsize) in (verbose[0][:1], verbose[1][:1])
+        assert bytes(classes.OpCode.load_left_hsize) in (verbose[0][:1], verbose[1][:1])
+        assert bytes(classes.OpCode.load_right_hsize) in (verbose[0][:1], verbose[1][:1])
         assert verbose[2][:1] in (
-            bytes(classes.OpCodes.hash_left),
-            bytes(classes.OpCodes.hash_right)
+            bytes(classes.OpCode.hash_left),
+            bytes(classes.OpCode.hash_right)
         )
-        if verbose[2][:1] == bytes(classes.OpCodes.hash_left):
-            assert verbose[3][:1] == bytes(classes.OpCodes.load_left_hsize)
+        if verbose[2][:1] == bytes(classes.OpCode.hash_left):
+            assert verbose[3][:1] == bytes(classes.OpCode.load_left_hsize)
         else:
-            assert verbose[3][:1] == bytes(classes.OpCodes.load_right_hsize)
+            assert verbose[3][:1] == bytes(classes.OpCode.load_right_hsize)
 
     def test_Tree_verify_executes_without_error_for_valid_proof(self):
         for i in range(2, 300):
@@ -223,7 +223,7 @@ class TestMerkle(unittest.TestCase):
         wrong_proof[1] = b'\x90' + wrong_proof[1][1:]
         result = classes.Tree.verify(tree.root, leaf, wrong_proof, True)
         assert not result[0]
-        assert str(result[1][0]) == "144 is not a valid OpCodes"
+        assert str(result[1][0]) == "144 is not a valid OpCode"
 
         wrong_proof = [*proof]
         wrong_proof[1] = wrong_proof[1][:-1] + b'\x99'
@@ -235,13 +235,13 @@ class TestMerkle(unittest.TestCase):
         legit_proof = tree.prove(b'leaf0')
 
         # first instruction in legit_proof is a load_left operation
-        assert legit_proof[0][:1] == bytes(classes.OpCodes.load_left_hsize)
+        assert legit_proof[0][:1] == bytes(classes.OpCode.load_left_hsize)
 
         # try to trick the validator by inserting malicious leaf then overwriting
         # with the load_left_hsize instruction from the legit_proof, then
         # continuing with the legit_proof
         malicious_proof = [
-            bytes(classes.OpCodes.load_left_hsize) + sha256(b'malicious leaf').digest(),
+            bytes(classes.OpCode.load_left_hsize) + sha256(b'malicious leaf').digest(),
             *legit_proof
         ]
 

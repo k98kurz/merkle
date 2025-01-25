@@ -55,12 +55,12 @@ class TestSparseSubTree(unittest.TestCase):
         for step in proof:
             assert type(step) is tuple
             for item in step:
-                assert type(item) in [bytes, vm.OpCodes, int]
+                assert type(item) in [bytes, vm.OpCode, int]
         assert len(proof) == 2*st1.level + 3
 
         # important for saving bytecode size across whole proof
-        assert proof[0][0] is vm.OpCodes.set_hsize
-        assert proof[-1][0] is vm.OpCodes.hash_final_hsize
+        assert proof[0][0] is vm.OpCode.set_hsize
+        assert proof[-1][0] is vm.OpCode.hash_final_hsize
 
         program = vm.compile(*proof)
         assert len(program) > 0 and type(program) is bytes
@@ -94,23 +94,23 @@ class TestSparseTree(unittest.TestCase):
         return super().setUpClass()
 
     def test_from_leaves(self):
-        sparse = sparse.SparseTree.from_leaves(self.leaves)
-        assert isinstance(sparse, sparse.SparseTree)
-        assert hasattr(sparse, 'root')
-        assert type(sparse.root) is bytes
-        assert len(sparse.root) == 32
-        assert hasattr(sparse, 'subtrees')
-        assert type(sparse.subtrees) is list
-        for item in sparse.subtrees:
+        tree = sparse.SparseTree.from_leaves(self.leaves)
+        assert isinstance(tree, sparse.SparseTree)
+        assert hasattr(tree, 'root')
+        assert type(tree.root) is bytes
+        assert len(tree.root) == 32
+        assert hasattr(tree, 'subtrees')
+        assert type(tree.subtrees) is list
+        for item in tree.subtrees:
             assert isinstance(item, sparse.SparseSubTree)
 
     def test_proof_e2e(self):
-        sparse = sparse.SparseTree.from_leaves(self.leaves)
-        proof = sparse.prove(self.leaves[0])
+        tree = sparse.SparseTree.from_leaves(self.leaves)
+        proof = tree.prove(self.leaves[0])
         assert type(proof) is bytes
         VM = vm.VirtualMachine(proof)
         assert VM.run(), VM.get_errors()
-        assert VM.registers['return'] == sparse.root, VM.registers
+        assert VM.registers['return'] == tree.root, VM.registers
 
 if __name__ == '__main__':
     unittest.main()

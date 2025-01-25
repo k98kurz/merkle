@@ -10,11 +10,11 @@ class TestXorHashTree(unittest.TestCase):
         return sha256(data).digest()
 
     @staticmethod
-    def print_proof(proof: list[tuple[vm.OpCodes|bytes,]]):
+    def print_proof(proof: list[tuple[vm.OpCode|bytes,]]):
         formatted_proof = []
         for step in proof:
             formatted_proof.append(tuple([
-                c.name if type(c) is vm.OpCodes else c.hex()
+                c.name if type(c) is vm.OpCode else c.hex()
                 for c in step
             ]))
         print(formatted_proof)
@@ -112,7 +112,7 @@ class TestXorHashTree(unittest.TestCase):
         assert type(deserialized) is xorhashtree.XorHashTree
         assert tree == deserialized
 
-    def test_XorHashTree_prove_produces_list_of_OpCodes_or_bytes_proof(self):
+    def test_XorHashTree_prove_produces_list_of_OpCode_or_bytes_proof(self):
         for i in range(2, 300):
             leaves = [n.to_bytes(2, 'big') for n in range(i)]
             tree = xorhashtree.XorHashTree.from_leaves(leaves)
@@ -123,11 +123,11 @@ class TestXorHashTree(unittest.TestCase):
             for step in proof:
                 assert type(step) is tuple
                 for item in step:
-                    assert type(item) in (bytes, vm.OpCodes)
+                    assert type(item) in (bytes, vm.OpCode)
             for step in proof_verbose:
                 assert type(step) is tuple
                 for item in step:
-                    assert type(item) in (bytes, vm.OpCodes)
+                    assert type(item) in (bytes, vm.OpCode)
 
     def test_XorHashTree_prove_raises_errors_for_invalid_params(self):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
@@ -160,17 +160,17 @@ class TestXorHashTree(unittest.TestCase):
         assert len(vm.compile(*verbose)) > len(vm.compile(*proof))
 
         # normal proof
-        assert vm.OpCodes.load_left_hsize in proof[0], proof[0]
-        assert vm.OpCodes.load_right_hsize in proof[1], proof[1]
+        assert vm.OpCode.load_left_hsize in proof[0], proof[0]
+        assert vm.OpCode.load_right_hsize in proof[1], proof[1]
         for i in range(1, len(proof)-1):
             step = proof[i]
-            assert step[0] is vm.OpCodes.hash_xor_left, (i, step)
-        assert proof[-1][0] is vm.OpCodes.hash_xor_final
+            assert step[0] is vm.OpCode.hash_xor_left, (i, step)
+        assert proof[-1][0] is vm.OpCode.hash_xor_final
 
         # verbose proof
         for i in range(len(verbose)-1):
             step = verbose[i]
-            assert vm.OpCodes.load_left_hsize in step, (i, step)
+            assert vm.OpCode.load_left_hsize in step, (i, step)
 
     def test_XorHashTree_verify_executes_without_error_for_valid_proof(self):
         for i in range(2, 300):
@@ -197,12 +197,12 @@ class TestXorHashTree(unittest.TestCase):
 
         with self.assertRaises(TypeError) as e:
             xorhashtree.XorHashTree.verify(tree.root, leaf, {'not': 'list'})
-        assert str(e.exception) == 'proof must be bytes or list of tuple[OpCodes|bytes,]'
+        assert str(e.exception) == 'proof must be bytes or list of tuple[OpCode|bytes,]'
 
         with self.assertRaises(TypeError) as e:
             wrong_proof = ['not bytes']
             xorhashtree.XorHashTree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof must be list of tuple[OpCodes|bytes,]', str(e.exception)
+        assert str(e.exception) == 'proof must be list of tuple[OpCode|bytes,]', str(e.exception)
 
     def test_XorHashTree_verify_returns_False_and_errors_for_invalid_proofs(self):
         leaves = [n.to_bytes(3, 'big') for n in range(13)]
@@ -250,13 +250,13 @@ class TestXorHashTree(unittest.TestCase):
         legit_proof = tree.prove(b'leaf0')
 
         # first instruction in legit_proof is a load_left operation
-        assert legit_proof[0][0] is vm.OpCodes.load_left_hsize
+        assert legit_proof[0][0] is vm.OpCode.load_left_hsize
 
         # try to trick the validator by inserting malicious leaf then overwriting
         # with the load_left_hsize instruction from the legit_proof, then
         # continuing with the legit_proof
         malicious_proof = [
-            (vm.OpCodes.load_left_hsize, sha256(b'malicious leaf').digest()),
+            (vm.OpCode.load_left_hsize, sha256(b'malicious leaf').digest()),
             *legit_proof
         ]
 

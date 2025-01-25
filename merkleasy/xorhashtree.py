@@ -3,7 +3,7 @@ from .errors import tert, eruces, vert, SecurityError
 from .vm import (
     get_hash_function,
     VirtualMachine,
-    OpCodes,
+    OpCode,
     compile,
     decompile,
     hash_leaf,
@@ -134,7 +134,7 @@ class XorHashTree:
         """Deserialize from json and return an instance."""
         return cls.from_dict(json.loads(data))
 
-    def prove(self, leaf: bytes, verbose: bool = False) -> list[tuple[OpCodes|bytes,]]:
+    def prove(self, leaf: bytes, verbose: bool = False) -> list[tuple[OpCode|bytes,]]:
         """Create an inclusion proof for a leaf. Use verbose=True to add
             hash checks at each tree level.
         """
@@ -157,14 +157,14 @@ class XorHashTree:
         first = True
 
         for direction in history:
-            step = [OpCodes.hash_xor_left] if not first else []
+            step = [OpCode.hash_xor_left] if not first else []
             if first or verbose:
-                step.extend([OpCodes.load_left_hsize, node[0]])
+                step.extend([OpCode.load_left_hsize, node[0]])
                 first = False
             if direction == -1:
-                step.extend([OpCodes.load_right_hsize, node[1].right_bytes])
+                step.extend([OpCode.load_right_hsize, node[1].right_bytes])
             else:
-                step.extend([OpCodes.load_right_hsize, node[1].left_bytes])
+                step.extend([OpCode.load_right_hsize, node[1].left_bytes])
 
             proof.append(tuple(step))
 
@@ -173,12 +173,12 @@ class XorHashTree:
                 new_node = node[1]
                 node = [n for n in nodes if n[0] == new_node.root][0]
 
-        proof.append((OpCodes.hash_xor_final, self.root))
+        proof.append((OpCode.hash_xor_final, self.root))
 
         return proof
 
     @staticmethod
-    def verify(root: bytes, leaf: bytes, proof: bytes|list[tuple[OpCodes|bytes,]],
+    def verify(root: bytes, leaf: bytes, proof: bytes|list[tuple[OpCode|bytes,]],
                report_errors: bool = False
     ) -> bool|tuple[bool, list[BaseException,]]:
         """Verify an inclusion proof is valid. If report_errors is True,
@@ -187,13 +187,13 @@ class XorHashTree:
         tert(type(root) is bytes, 'root must be bytes')
         tert(type(leaf) is bytes, 'leaf must be bytes')
         tert(type(proof) in (list, bytes),
-             'proof must be bytes or list of tuple[OpCodes|bytes,]')
+             'proof must be bytes or list of tuple[OpCode|bytes,]')
 
         if type(proof) is list:
             tert(all(isinstance(p, tuple) for p in proof),
-                 'proof must be list of tuple[OpCodes|bytes,]')
-            tert(all(type(c) in (OpCodes, bytes) for step in proof for c in step),
-                 'proof must be list of tuple[OpCodes|bytes,]')
+                 'proof must be list of tuple[OpCode|bytes,]')
+            tert(all(type(c) in (OpCode, bytes) for step in proof for c in step),
+                 'proof must be list of tuple[OpCode|bytes,]')
             try:
                 proof = compile(*proof)
             except Exception as e:
@@ -209,7 +209,7 @@ class XorHashTree:
             return False
 
         leaf_hash = hash_leaf(leaf)
-        index = 3 if decompiled[0] is OpCodes.set_hsize else 1
+        index = 3 if decompiled[0] is OpCode.set_hsize else 1
         if decompiled[index] not in (leaf, leaf_hash):
             if report_errors:
                 return (False, (SecurityError('proof does not reference leaf'),))

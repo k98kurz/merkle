@@ -45,7 +45,7 @@ def xor(b1: bytes, b2: bytes) -> bytes:
     return bytes(b3)
 
 
-class OpCodes(Enum):
+class OpCode(Enum):
     load_left_hsize = 0
     load_right_hsize = 1
     hash_left = 2
@@ -588,41 +588,41 @@ def move_to_right(vm: VMProtocol):
     vm.debug('move_to_right', result.hex())
 
 instruction_set = {
-    OpCodes.load_left_hsize: load_left_hsize,
-    OpCodes.load_right_hsize: load_right_hsize,
-    OpCodes.hash_left: hash_left,
-    OpCodes.hash_right: hash_right,
-    OpCodes.hash_final_hsize: hash_final_hsize,
-    OpCodes.hash_mid: hash_mid,
-    OpCodes.hash_leaf_left: hash_leaf_left,
-    OpCodes.hash_leaf_right: hash_leaf_right,
-    OpCodes.hash_leaf_mid: hash_leaf_mid,
-    OpCodes.hash_leaf_bit: hash_leaf_bit,
-    OpCodes.hash_bit: hash_bit,
-    OpCodes.hash_final: hash_final,
-    OpCodes.hash_with_empty: hash_with_empty,
-    OpCodes.hash_to_level: hash_to_level,
-    OpCodes.hash_to_level_hsize: hash_to_level_hsize,
-    OpCodes.hash_to_level_path: hash_to_level_path,
-    OpCodes.hash_left_only: hash_left_only,
-    OpCodes.hash_right_only: hash_right_only,
-    OpCodes.hash_xor_left: hash_xor_left,
-    OpCodes.hash_xor_left: hash_xor_left,
-    OpCodes.hash_xor_right: hash_xor_right,
-    OpCodes.hash_xor_final: hash_xor_final,
-    OpCodes.load_left: load_left,
-    OpCodes.load_right: load_right,
-    OpCodes.load_empty_left: load_empty_left,
-    OpCodes.load_empty_right: load_empty_right,
-    OpCodes.set_hsize: set_hsize,
-    OpCodes.set_path: set_path,
-    OpCodes.set_path_hsize: set_path_hsize,
-    OpCodes.set_path_auto: set_path_auto,
-    OpCodes.get_path_bit: get_path_bit,
-    OpCodes.subroutine_left: subroutine_left,
-    OpCodes.subroutine_right: subroutine_right,
-    OpCodes.move_to_left: move_to_left,
-    OpCodes.move_to_right: move_to_right,
+    OpCode.load_left_hsize: load_left_hsize,
+    OpCode.load_right_hsize: load_right_hsize,
+    OpCode.hash_left: hash_left,
+    OpCode.hash_right: hash_right,
+    OpCode.hash_final_hsize: hash_final_hsize,
+    OpCode.hash_mid: hash_mid,
+    OpCode.hash_leaf_left: hash_leaf_left,
+    OpCode.hash_leaf_right: hash_leaf_right,
+    OpCode.hash_leaf_mid: hash_leaf_mid,
+    OpCode.hash_leaf_bit: hash_leaf_bit,
+    OpCode.hash_bit: hash_bit,
+    OpCode.hash_final: hash_final,
+    OpCode.hash_with_empty: hash_with_empty,
+    OpCode.hash_to_level: hash_to_level,
+    OpCode.hash_to_level_hsize: hash_to_level_hsize,
+    OpCode.hash_to_level_path: hash_to_level_path,
+    OpCode.hash_left_only: hash_left_only,
+    OpCode.hash_right_only: hash_right_only,
+    OpCode.hash_xor_left: hash_xor_left,
+    OpCode.hash_xor_left: hash_xor_left,
+    OpCode.hash_xor_right: hash_xor_right,
+    OpCode.hash_xor_final: hash_xor_final,
+    OpCode.load_left: load_left,
+    OpCode.load_right: load_right,
+    OpCode.load_empty_left: load_empty_left,
+    OpCode.load_empty_right: load_empty_right,
+    OpCode.set_hsize: set_hsize,
+    OpCode.set_path: set_path,
+    OpCode.set_path_hsize: set_path_hsize,
+    OpCode.set_path_auto: set_path_auto,
+    OpCode.get_path_bit: get_path_bit,
+    OpCode.subroutine_left: subroutine_left,
+    OpCode.subroutine_right: subroutine_right,
+    OpCode.move_to_left: move_to_left,
+    OpCode.move_to_right: move_to_right,
 }
 
 
@@ -633,7 +633,7 @@ class VirtualMachine:
     registers: dict[str, bytes|bool|int|None|list]
 
     def __init__(self, program: bytes = b'', pointer: int = 0,
-                 instruction_set: dict[OpCodes, Callable] = instruction_set,
+                 instruction_set: dict[OpCode, Callable] = instruction_set,
                  debug: bool = False) -> None:
         self.program = program
         self.pointer = pointer
@@ -672,7 +672,7 @@ class VirtualMachine:
         """
         try:
             op = self.read(1)[0]
-            code = OpCodes(op)
+            code = OpCode(op)
             self.instruction_set[code](self)
             return True
         except BaseException as e:
@@ -742,18 +742,18 @@ class VirtualMachine:
             self._debug_context += 1
 
 
-def compile(*symbols: OpCodes|bytes|int|tuple[OpCodes|bytes|int,]) -> bytes:
-    """Compiles a list of OpCodes, bytes, and ints into byte code.
+def compile(*symbols: OpCode|bytes|int|tuple[OpCode|bytes|int,]) -> bytes:
+    """Compiles a list of OpCode, bytes, and ints into byte code.
         Raises SyntaxError for invalid VM code syntax. Raises TypeError
         for invalid symbols.
     """
     flattened = []
     for symbol, index in zip(symbols, range(len(symbols))):
-        tert(type(symbol) in (OpCodes, bytes, int, tuple),
+        tert(type(symbol) in (OpCode, bytes, int, tuple),
             f"Symbol at {index}: type {type(symbol)} not supported")
         if type(symbol) is tuple:
-            tert(all([type(item) in (OpCodes, bytes, int) for item in symbol]),
-                 f"Symbol at {index}: tuple must contain OpCodes, bytes, and/or int")
+            tert(all([type(item) in (OpCode, bytes, int) for item in symbol]),
+                 f"Symbol at {index}: tuple must contain OpCode, bytes, and/or int")
             flattened.extend(symbol)
         else:
             flattened.append(symbol)
@@ -769,70 +769,70 @@ def compile(*symbols: OpCodes|bytes|int|tuple[OpCodes|bytes|int,]) -> bytes:
 
 _advance_ = {
     'op': (
-        OpCodes.hash_mid,
-        OpCodes.hash_left,
-        OpCodes.hash_right,
-        OpCodes.hash_leaf_left,
-        OpCodes.hash_leaf_right,
-        OpCodes.hash_leaf_mid,
-        OpCodes.hash_leaf_bit,
-        OpCodes.hash_bit,
-        OpCodes.hash_left_only,
-        OpCodes.hash_right_only,
-        OpCodes.hash_xor_left,
-        OpCodes.hash_xor_right,
-        OpCodes.set_path_auto,
+        OpCode.hash_mid,
+        OpCode.hash_left,
+        OpCode.hash_right,
+        OpCode.hash_leaf_left,
+        OpCode.hash_leaf_right,
+        OpCode.hash_leaf_mid,
+        OpCode.hash_leaf_bit,
+        OpCode.hash_bit,
+        OpCode.hash_left_only,
+        OpCode.hash_right_only,
+        OpCode.hash_xor_left,
+        OpCode.hash_xor_right,
+        OpCode.set_path_auto,
     ),
     'op bytes': (
-        OpCodes.load_left_hsize,
-        OpCodes.load_right_hsize,
-        OpCodes.hash_final_hsize,
-        OpCodes.set_path_hsize,
+        OpCode.load_left_hsize,
+        OpCode.load_right_hsize,
+        OpCode.hash_final_hsize,
+        OpCode.set_path_hsize,
     ),
     'op u8 bytes': (
-        OpCodes.hash_final,
-        OpCodes.hash_xor_final,
+        OpCode.hash_final,
+        OpCode.hash_xor_final,
     ),
     'op u16 bytes': (
-        OpCodes.load_left,
-        OpCodes.load_right,
-        OpCodes.subroutine_left,
-        OpCodes.subroutine_right,
-        OpCodes.set_path,
+        OpCode.load_left,
+        OpCode.load_right,
+        OpCode.subroutine_left,
+        OpCode.subroutine_right,
+        OpCode.set_path,
     ),
     'op u8 u8 u16 bytes': (
-        OpCodes.hash_to_level,
+        OpCode.hash_to_level,
     ),
     'op u8 u8 bytes': (
-        OpCodes.hash_to_level_hsize,
+        OpCode.hash_to_level_hsize,
     ),
     'op u8': (
-        OpCodes.set_hsize,
-        OpCodes.get_path_bit,
-        OpCodes.hash_with_empty,
-        OpCodes.load_empty_left,
-        OpCodes.load_empty_right,
+        OpCode.set_hsize,
+        OpCode.get_path_bit,
+        OpCode.hash_with_empty,
+        OpCode.load_empty_left,
+        OpCode.load_empty_right,
     ),
     'op u8 u8': (
-        OpCodes.hash_to_level_path,
+        OpCode.hash_to_level_path,
     )
 }
 
-def _compile_next(index: int, symbols: list[OpCodes|bytes|int,]) -> tuple[bytes, int]:
+def _compile_next(index: int, symbols: list[OpCode|bytes|int,]) -> tuple[bytes, int]:
     """Compiles the next op into byte code using remaining symbols.
         Returns the byte code and the number of symbols to advance.
         Raises SyntaxError if the symbol at the index is not an OpCode
         or if the symbols did not contain valid parameters for the
         OpCode.
     """
-    yert(type(symbols[index]) is OpCodes,
-        f"Symbol at {index}: expected OpCodes element.")
+    yert(type(symbols[index]) is OpCode,
+        f"Symbol at {index}: expected OpCode element.")
 
-    def check_param_count(symbols: list[OpCodes|bytes|int], index: int, count: int, params: str):
+    def check_param_count(symbols: list[OpCode|bytes|int], index: int, count: int, params: str):
         yert(len(symbols[index:]) >= count+1,
              f"Symbol at {index}: expected {'params' if count>1 else 'param'} {params}")
 
-    def check_u8(symbols: list[OpCodes|bytes|int], index: int, offset: int):
+    def check_u8(symbols: list[OpCode|bytes|int], index: int, offset: int):
         yert(type(symbols[index+offset]) is int,
              f"Symbol at {index+offset} (after {op.name}): expected int; " +
              f"{type(symbols[index+offset])} not supported")
@@ -840,7 +840,7 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int,]) -> tuple[bytes,
              f"Symbol at {index+offset} (after {op.name}): " +
              f"expected 0<={symbols[index+offset]}<=255")
 
-    def check_bytes_255(symbols: list[OpCodes|bytes|int], index: int, offset: int):
+    def check_bytes_255(symbols: list[OpCode|bytes|int], index: int, offset: int):
         yert(type(symbols[index+offset]) is bytes,
              f"Symbol at {index+offset} (after {op.name} {symbols[index+1]} " +
              f"{symbols[index+offset]}): expected bytes up to 255 length; " +
@@ -850,7 +850,7 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int,]) -> tuple[bytes,
              f"{symbols[index+offset]}): expected bytes up to 255 length; " +
              f"{len(symbols[index+offset])} is too large")
 
-    def check_bytes_65535(symbols: list[OpCodes|bytes|int], index: int, offset: int):
+    def check_bytes_65535(symbols: list[OpCode|bytes|int], index: int, offset: int):
         yert(type(symbols[index+offset]) is bytes,
              f"Symbol at {index+offset} (after {op.name} {symbols[index+1]}): " +
              f"expected bytes up to 65535 length; " +
@@ -923,17 +923,17 @@ def _compile_next(index: int, symbols: list[OpCodes|bytes|int,]) -> tuple[bytes,
     return (code, 1)
 
 
-def decompile(code: bytes) -> list[OpCodes|bytes|int]:
-    """Decompiles bytecode into a list of OpCodes, bytes, and ints."""
+def decompile(code: bytes) -> list[OpCode|bytes|int]:
+    """Decompiles bytecode into a list of OpCode, bytes, and ints."""
     proof = []
     index = 0
     hsize = 32
     while index < len(code):
-        op = OpCodes(code[index])
+        op = OpCode(code[index])
         proof.append(op)
         index += 1
 
-        if op is OpCodes.set_hsize:
+        if op is OpCode.set_hsize:
             hsize = code[index]
             proof.append(hsize)
             index += 1
@@ -976,5 +976,5 @@ def adapt_legacy_proof(proof: list[bytes], hash_size: int = 32) -> bytes:
     """
     tert(all([type(step) is bytes for step in proof]),
            'proof must be bytes or list of bytes')
-    return OpCodes.set_hsize.value.to_bytes(1, 'big') + \
+    return OpCode.set_hsize.value.to_bytes(1, 'big') + \
         (hash_size).to_bytes(1, 'big') + b''.join(proof)

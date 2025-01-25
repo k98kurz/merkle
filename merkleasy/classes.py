@@ -5,7 +5,7 @@ from .vm import (
     get_hash_function,
     set_hash_function,
     VirtualMachine,
-    OpCodes,
+    OpCode,
     compile,
     decompile,
     adapt_legacy_proof,
@@ -181,24 +181,24 @@ class Tree:
         for direction in history:
             if direction == -1:
                 # left element
-                proof.append(compile(OpCodes.hash_left))
+                proof.append(compile(OpCode.hash_left))
                 if first or verbose:
-                    proof.append(compile(OpCodes.load_left_hsize, node[0]))
+                    proof.append(compile(OpCode.load_left_hsize, node[0]))
                     first = False
-                proof.append(compile(OpCodes.load_right_hsize, node[1].right_bytes))
+                proof.append(compile(OpCode.load_right_hsize, node[1].right_bytes))
             else:
                 # right element
-                proof.append(compile(OpCodes.hash_right))
+                proof.append(compile(OpCode.hash_right))
                 if first or verbose:
-                    proof.append(compile(OpCodes.load_right_hsize, node[0]))
+                    proof.append(compile(OpCode.load_right_hsize, node[0]))
                     first = False
-                proof.append(compile(OpCodes.load_left_hsize, node[1].left_bytes))
+                proof.append(compile(OpCode.load_left_hsize, node[1].left_bytes))
 
             # advance
             if node[1] is not self:
                 new_node = node[1]
                 node = [n for n in nodes if n[0] == new_node.root][0]
-        proof = [*proof[1:], compile(OpCodes.hash_final_hsize, self.root)]
+        proof = [*proof[1:], compile(OpCode.hash_final_hsize, self.root)]
 
         return proof
 
@@ -226,7 +226,7 @@ class Tree:
             return False
 
         leaf_hash = hash_leaf(leaf)
-        index = 3 if decompiled[0] is OpCodes.set_hsize else 1
+        index = 3 if decompiled[0] is OpCode.set_hsize else 1
         if decompiled[index] not in (leaf, leaf_hash):
             if report_errors:
                 return (False, (SecurityError('proof does not reference leaf'),))

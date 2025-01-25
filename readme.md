@@ -71,7 +71,7 @@ resolved, this notice will be removed.
 - `Tree`
 - `XorHashTree`
 - `VirtualMachine`
-- `OpCodes`
+- `OpCode`
 
 The Usage section describes for each method/function which (if any) errors it
 can raise.
@@ -281,7 +281,7 @@ else:
 ```
 
 This static method parses the proof, interpreting the first byte in each proof
-step as a code from `vm.OpCodes`. It ensures that the proof starts with
+step as a code from `vm.OpCode`. It ensures that the proof starts with
 the leaf and ends with the root, and then it follows the proof operations.
 
 Raises `TypeError` when provided invalid parameters. If all type checks pass, it
