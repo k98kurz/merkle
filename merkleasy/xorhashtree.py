@@ -14,6 +14,9 @@ import json
 
 
 class XorHashTree:
+    """An XOR Hash Tree. It is a node with a left and right branch, and the
+        root is the XOR of the hashes of the left and right branches.
+    """
     root: bytes
     parent: Optional[XorHashTree]
     left: XorHashTree | bytes
@@ -31,6 +34,7 @@ class XorHashTree:
 
     @parent.setter
     def parent(self, parent) -> None:
+        """Set the parent. Raises `TypeError` upon invalid input."""
         tert(isinstance(parent, XorHashTree) or parent is None, 'invalid parent')
         self._parent = parent
 

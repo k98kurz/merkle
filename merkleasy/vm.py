@@ -637,6 +637,9 @@ class VirtualMachine:
     def __init__(self, program: bytes = b'', pointer: int = 0,
                  instruction_set: dict[OpCode, Callable] = instruction_set,
                  debug: bool = False) -> None:
+        """Initialize the VM with the given program, pointer, instruction
+            set, and debug flag.
+        """
         self.program = program
         self.pointer = pointer
         self.instruction_set = instruction_set
@@ -664,6 +667,9 @@ class VirtualMachine:
         return self.registers['final']
 
     def read(self, count: int = 1) -> bytes:
+        """Reads count bytes from the program, advances the pointer, and
+            returns the read bytes.
+        """
         result = self.program[self.pointer:self.pointer+count]
         self.pointer += count
         return result

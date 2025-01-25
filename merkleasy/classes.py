@@ -17,6 +17,9 @@ import json
 
 
 class Tree:
+    """A basic Merkle Tree. It is a node with a left and right branch,
+        and the root is the hash of the left and right branches.
+    """
     root: bytes
     parent: Optional[Tree]
     left: Tree | bytes

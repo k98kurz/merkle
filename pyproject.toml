@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "merkleasy"
-version = "0.0.3.1"
+version = "0.1.0"
 authors = [
   { name="k98kurz", email="k98kurz@gmail.com" },
 ]
-description = "Simple, easy-to-use merkle tree library"
+description = "Easy-to-use Merkle tree library."
 readme = "readme.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: ISC License (ISCL)",
