@@ -69,6 +69,12 @@ class Tree:
         self._left = left if type(left) in (Tree, bytes) else bytes(left)
         self._right = right if type(right) in (Tree, bytes) else bytes(right)
         self.parent = None
+        _hsize = len(hash_leaf(b''))
+
+        if type(self._left) is bytes and len(self._left) != _hsize:
+            self._left = hash_leaf(self._left)
+        if type(self._right) is bytes and len(self._right) != _hsize:
+            self._right = hash_leaf(self._right)
 
         if type(self.left) is Tree:
             self.left.parent = self
