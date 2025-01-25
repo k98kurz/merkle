@@ -46,6 +46,7 @@ def xor(b1: bytes, b2: bytes) -> bytes:
 
 
 class OpCode(Enum):
+    """The set of op codes supported by the VM."""
     load_left_hsize = 0
     load_right_hsize = 1
     hash_left = 2
@@ -67,19 +68,19 @@ class OpCode(Enum):
     hash_xor_left = 18
     hash_xor_right = 19
     hash_xor_final = 20
-    load_left = 30
-    load_right = 31
-    load_empty_left = 32
-    load_empty_right = 33
-    set_hsize = 40
-    set_path = 41
-    set_path_hsize = 42
-    set_path_auto = 43
-    get_path_bit = 44
-    subroutine_left = 50
-    subroutine_right = 51
-    move_to_left = 52
-    move_to_right = 53
+    load_left = 40
+    load_right = 41
+    load_empty_left = 42
+    load_empty_right = 43
+    set_hsize = 50
+    set_path = 51
+    set_path_hsize = 52
+    set_path_auto = 53
+    get_path_bit = 54
+    subroutine_left = 60
+    subroutine_right = 61
+    move_to_left = 62
+    move_to_right = 63
 
     def __bytes__(self) -> bytes:
         return self.value.to_bytes(1, 'big')
