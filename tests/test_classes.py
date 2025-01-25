@@ -1,4 +1,4 @@
-from context import classes, errors
+from context import classes, errors, vm
 from hashlib import sha256, sha3_256
 from random import randint
 import unittest
@@ -106,18 +106,18 @@ class TestMerkle(unittest.TestCase):
         assert type(deserialized) is classes.Tree
         assert tree == deserialized
 
-    def test_Tree_prove_produces_list_of_bytes_proof(self):
+    def test_Tree_prove_produces_bytes_proof(self):
         for i in range(2, 300):
             leaves = [n.to_bytes(2, 'big') for n in range(i)]
             tree = classes.Tree.from_leaves(leaves)
-            proof = tree.prove(randint(0, i-1).to_bytes(2, 'big'))
-            proof_verbose = tree.prove(randint(0, i-1).to_bytes(2, 'big'), verbose=True)
-            assert type(proof) is list
-            assert type(proof_verbose) is list
-            for step in proof:
-                assert type(step) is bytes
-            for step in proof_verbose:
-                assert type(step) is bytes
+            leaf = leaves[randint(0, i-1)]
+            proof = tree.prove(leaf)
+            proof_verbose = tree.prove(leaf, verbose=True)
+            assert type(proof) is bytes
+            assert type(proof_verbose) is bytes
+            assert len(proof) > 0
+            assert len(proof_verbose) > 0
+            assert len(proof_verbose) >= len(proof), f'({i=}) {len(proof_verbose)=} >= {len(proof)=}'
 
     def test_Tree_prove_raises_errors_for_invalid_params(self):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
@@ -140,29 +140,32 @@ class TestMerkle(unittest.TestCase):
 
         assert len(verbose) > len(proof)
 
+        verbose = vm.decompile(verbose)
+        proof = vm.decompile(proof)
+
         # normal proof
-        assert bytes(classes.OpCode.load_left_hsize) in (proof[0][:1], proof[1][:1])
-        assert bytes(classes.OpCode.load_right_hsize) in (proof[0][:1], proof[1][:1])
-        assert proof[2][:1] in (
-            bytes(classes.OpCode.hash_left),
-            bytes(classes.OpCode.hash_right)
+        assert classes.OpCode.load_left_hsize in proof[:3]
+        assert classes.OpCode.load_right_hsize in proof[:3]
+        assert proof[4] in (
+            classes.OpCode.hash_left,
+            classes.OpCode.hash_right
         )
-        if proof[2][:1] == bytes(classes.OpCode.hash_left):
-            assert proof[3][:1] != bytes(classes.OpCode.load_left_hsize)
+        if proof[4] == classes.OpCode.hash_left:
+            assert proof[5] != classes.OpCode.load_left_hsize
         else:
-            assert proof[3][:1] != bytes(classes.OpCode.load_right_hsize)
+            assert proof[5] != classes.OpCode.load_right_hsize
 
         # verbose proof
-        assert bytes(classes.OpCode.load_left_hsize) in (verbose[0][:1], verbose[1][:1])
-        assert bytes(classes.OpCode.load_right_hsize) in (verbose[0][:1], verbose[1][:1])
-        assert verbose[2][:1] in (
-            bytes(classes.OpCode.hash_left),
-            bytes(classes.OpCode.hash_right)
+        assert classes.OpCode.load_left_hsize in verbose[:3]
+        assert classes.OpCode.load_right_hsize in verbose[:3]
+        assert verbose[4] in (
+            classes.OpCode.hash_left,
+            classes.OpCode.hash_right
         )
-        if verbose[2][:1] == bytes(classes.OpCode.hash_left):
-            assert verbose[3][:1] == bytes(classes.OpCode.load_left_hsize)
+        if verbose[4] == classes.OpCode.hash_left:
+            assert verbose[5] == classes.OpCode.load_left_hsize
         else:
-            assert verbose[3][:1] == bytes(classes.OpCode.load_right_hsize)
+            assert verbose[5] == classes.OpCode.load_right_hsize
 
     def test_Tree_verify_executes_without_error_for_valid_proof(self):
         for i in range(2, 300):
@@ -199,58 +202,61 @@ class TestMerkle(unittest.TestCase):
         leaves = [n.to_bytes(3, 'big') for n in range(13)]
         tree = classes.Tree.from_leaves(leaves)
         leaf = leaves[3]
-        proof = tree.prove(leaf)
+        proof = vm.decompile(tree.prove(leaf))
 
-        result = classes.Tree.verify(tree.root, leaf, proof, True)
+        result = classes.Tree.verify(tree.root, leaf, vm.compile(*proof), True)
         assert result[0], result[1]
 
-        assert not classes.Tree.verify(tree.root, b'\x00', proof)
+        assert not classes.Tree.verify(tree.root, b'\x00', vm.compile(*proof))
 
-        wrong_proof = proof[1:]
-        result = classes.Tree.verify(tree.root, leaf, wrong_proof, True)
+        wrong_proof = proof[2:]
+        result = classes.Tree.verify(tree.root, leaf, vm.compile(*wrong_proof), True)
         assert len(result[1]) == 1
-        assert type(result[1][0]) is errors.SecurityError
+        assert type(result[1][0]) is errors.SecurityError, f'{result[1][0]}'
         assert str(result[1][0]) == 'proof does not reference leaf'
 
-        wrong_proof = proof[:-1]
-        assert not classes.Tree.verify(tree.root, leaf, wrong_proof)
+        wrong_proof = proof[:-2]
+        assert not classes.Tree.verify(tree.root, leaf, vm.compile(*wrong_proof))
 
         wrong_proof = [*proof]
         wrong_proof[-1] = wrong_proof[-1][:-4] + b'\xfe\xed\xbe\xef'
-        assert not classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert not classes.Tree.verify(tree.root, leaf, vm.compile(*wrong_proof))
 
         wrong_proof = [*proof]
-        wrong_proof[1] = b'\x90' + wrong_proof[1][1:]
+        wrong_proof = vm.compile(*wrong_proof[:2]) + b'\x90' + vm.compile(*wrong_proof[2:])
         result = classes.Tree.verify(tree.root, leaf, wrong_proof, True)
         assert not result[0]
-        assert str(result[1][0]) == "144 is not a valid OpCode"
+        assert str(result[1][0]) == "144 is not a valid OpCode", f'{result[1][0]}'
 
         wrong_proof = [*proof]
         wrong_proof[1] = wrong_proof[1][:-1] + b'\x99'
-        assert not classes.Tree.verify(tree.root, leaf, wrong_proof)
+        assert not classes.Tree.verify(tree.root, leaf, vm.compile(*wrong_proof))
 
     def test_Tree_verify_does_not_validate_malicious_proof(self):
         leaves = [b'leaf0', b'leaf1', b'leaf2']
         tree = classes.Tree.from_leaves(leaves)
-        legit_proof = tree.prove(b'leaf0')
+        legit_proof = vm.decompile(tree.prove(b'leaf0'))
 
         # first instruction in legit_proof is a load_left operation
-        assert legit_proof[0][:1] == bytes(classes.OpCode.load_left_hsize)
+        assert legit_proof[0] is classes.OpCode.load_left_hsize
 
         # try to trick the validator by inserting malicious leaf then overwriting
         # with the load_left_hsize instruction from the legit_proof, then
         # continuing with the legit_proof
         malicious_proof = [
-            bytes(classes.OpCode.load_left_hsize) + sha256(b'malicious leaf').digest(),
+            classes.OpCode.load_left_hsize,
+            sha256(b'malicious leaf').digest(),
             *legit_proof
         ]
 
         # prevent proof hijacking
-        assert not classes.Tree.verify(tree.root, b'malicious leaf', malicious_proof)
+        assert not classes.Tree.verify(tree.root, b'malicious leaf', vm.compile(*malicious_proof))
 
         # try to trick the validator by using a proof for a different tree
-        malicious_proof = classes.Tree.from_leaves([b'malicious', b'leaves']).prove(b'malicious')
-        result = classes.Tree.verify(tree.root, b'malicious', malicious_proof, True)
+        malicious_proof = vm.decompile(
+            classes.Tree.from_leaves([b'malicious', b'leaves']).prove(b'malicious')
+        )
+        result = classes.Tree.verify(tree.root, b'malicious', vm.compile(*malicious_proof), True)
         assert not result[0]
         assert type(result[1][0]) is errors.SecurityError
         assert str(result[1][0]) == 'proof does not reference root'

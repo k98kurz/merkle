@@ -155,10 +155,11 @@ class Tree:
         """
         return cls.from_dict(json.loads(data))
 
-    def prove(self, leaf: bytes, verbose: bool = False) -> list[bytes]:
+    def prove(self, leaf: bytes, verbose: bool = False) -> bytes:
         """Create an inclusion proof for a leaf. Use verbose=True to add
             hash checks at each tree level. Raises `TypeError` or
-            `ValueError` upon invalid input.
+            `ValueError` upon invalid input. Consists of `OpCode`s and
+            their arguments compiled into bytes.
         """
         tert(type(leaf) is bytes, 'leaf must be bytes')
         leaf_hash = hash_leaf(leaf)
@@ -174,7 +175,7 @@ class Tree:
         node = [n for n in nodes if n[0] in (leaf, leaf_hash)][0]
 
         # reverse the history
-        history = list(node)[2][::-1]
+        history = node[2][::-1]
         proof = []
         first = True
 
@@ -200,7 +201,7 @@ class Tree:
                 node = [n for n in nodes if n[0] == new_node.root][0]
         proof = [*proof[1:], compile(OpCode.hash_final_hsize, self.root)]
 
-        return proof
+        return b''.join(proof)
 
     @staticmethod
     def verify(root: bytes, leaf: bytes, proof: bytes|list[bytes],
@@ -208,7 +209,10 @@ class Tree:
     ) -> bool|tuple[bool, list[BaseException,]]:
         """Verify an inclusion proof is valid. If report_errors is True,
             returns status and errors. Otherwise, returns status. Raises
-            `TypeError` or `ValueError` upon invalid input.
+            `TypeError` or `ValueError` upon invalid input. Currently
+            accepts proofs made with the 0.0.1 version of the library,
+            but this will be dropped in a future version; it does not
+            accept decompiled proofs.
         """
         # preconditions
         tert(type(root) is bytes, 'root must be bytes')
