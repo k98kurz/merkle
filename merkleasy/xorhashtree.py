@@ -134,9 +134,11 @@ class XorHashTree:
         """Deserialize from json and return an instance."""
         return cls.from_dict(json.loads(data))
 
-    def prove(self, leaf: bytes, verbose: bool = False) -> list[tuple[OpCode|bytes,]]:
+    def prove(self, leaf: bytes, verbose: bool = False) -> bytes:
         """Create an inclusion proof for a leaf. Use verbose=True to add
-            hash checks at each tree level.
+            hash checks at each tree level. Raises `TypeError` or
+            `ValueError` upon invalid input. Return value consists of
+            `OpCode`s and their arguments compiled into bytes.
         """
         tert(type(leaf) is bytes, 'leaf must be bytes')
         leaf_hash = hash_leaf(leaf)
@@ -175,14 +177,15 @@ class XorHashTree:
 
         proof.append((OpCode.hash_xor_final, self.root))
 
-        return proof
+        return compile(*proof)
 
     @staticmethod
     def verify(root: bytes, leaf: bytes, proof: bytes|list[tuple[OpCode|bytes,]],
                report_errors: bool = False
     ) -> bool|tuple[bool, list[BaseException,]]:
         """Verify an inclusion proof is valid. If report_errors is True,
-            returns status and errors. Otherwise, returns status.
+            returns status and errors. Otherwise, returns status. Can
+            accept compiled or decompiled proofs.
         """
         tert(type(root) is bytes, 'root must be bytes')
         tert(type(leaf) is bytes, 'leaf must be bytes')
@@ -190,10 +193,12 @@ class XorHashTree:
              'proof must be bytes or list of tuple[OpCode|bytes,]')
 
         if type(proof) is list:
-            tert(all(isinstance(p, tuple) for p in proof),
+            tert(all(isinstance(p, tuple) for p in proof)
+                 or all(type(p) in (bytes, OpCode) for p in proof),
                  'proof must be list of tuple[OpCode|bytes,]')
-            tert(all(type(c) in (OpCode, bytes) for step in proof for c in step),
-                 'proof must be list of tuple[OpCode|bytes,]')
+            if type(proof[0]) is tuple:
+                tert(all(type(c) in (OpCode, bytes) for step in proof for c in step),
+                     'proof must be list of tuple[OpCode|bytes,]')
             try:
                 proof = compile(*proof)
             except Exception as e:

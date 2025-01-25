@@ -112,22 +112,18 @@ class TestXorHashTree(unittest.TestCase):
         assert type(deserialized) is xorhashtree.XorHashTree
         assert tree == deserialized
 
-    def test_XorHashTree_prove_produces_list_of_OpCode_or_bytes_proof(self):
+    def test_XorHashTree_prove_produces_bytes_proof(self):
         for i in range(2, 300):
             leaves = [n.to_bytes(2, 'big') for n in range(i)]
             tree = xorhashtree.XorHashTree.from_leaves(leaves)
-            proof = tree.prove(randint(0, i-1).to_bytes(2, 'big'))
-            proof_verbose = tree.prove(randint(0, i-1).to_bytes(2, 'big'), verbose=True)
-            assert type(proof) is list
-            assert type(proof_verbose) is list
-            for step in proof:
-                assert type(step) is tuple
-                for item in step:
-                    assert type(item) in (bytes, vm.OpCode)
-            for step in proof_verbose:
-                assert type(step) is tuple
-                for item in step:
-                    assert type(item) in (bytes, vm.OpCode)
+            leaf = randint(0, i-1).to_bytes(2, 'big')
+            proof = tree.prove(leaf)
+            proof_verbose = tree.prove(leaf, verbose=True)
+            assert type(proof) is bytes
+            assert type(proof_verbose) is bytes
+            decompiled = vm.decompile(proof)
+            decompiled_verbose = vm.decompile(proof_verbose)
+            assert len(decompiled_verbose) >= len(decompiled)
 
     def test_XorHashTree_prove_raises_errors_for_invalid_params(self):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
@@ -141,13 +137,14 @@ class TestXorHashTree(unittest.TestCase):
             tree.prove(b'not in tree')
         assert str(e.exception) == 'the given leaf was not found in the tree'
 
-    def test_XorHashTree_prove_result_compiles(self):
+    def test_XorHashTree_prove_result_decompiles(self):
         leaves = [n.to_bytes(2, 'big') for n in range(17)]
         tree = xorhashtree.XorHashTree.from_leaves(leaves)
         leaf_to_prove = randint(3, 15).to_bytes(2, 'big')
         proof = tree.prove(leaf_to_prove)
-        compiled = vm.compile(*proof)
-        assert type(compiled) is bytes
+        assert type(proof) is bytes
+        decompiled = vm.decompile(proof)
+        assert type(decompiled) is list
 
     def test_verbose_proof_is_longer_and_has_2_load_steps_after_hash(self):
         leaves = [n.to_bytes(2, 'big') for n in range(17)]
@@ -157,20 +154,23 @@ class TestXorHashTree(unittest.TestCase):
         # self.print_proof(proof)
         verbose = tree.prove(leaf_to_prove, verbose=True)
 
-        assert len(vm.compile(*verbose)) > len(vm.compile(*proof))
+        assert len(verbose) > len(proof)
 
         # normal proof
-        assert vm.OpCode.load_left_hsize in proof[0], proof[0]
-        assert vm.OpCode.load_right_hsize in proof[1], proof[1]
-        for i in range(1, len(proof)-1):
+        proof = vm.decompile(proof)
+        assert vm.OpCode.load_left_hsize in proof[:4], proof[:4]
+        assert vm.OpCode.load_right_hsize in proof[:4], proof[:4]
+        for i in range(4, len(proof)-2, 3):
             step = proof[i]
-            assert step[0] is vm.OpCode.hash_xor_left, (i, step)
-        assert proof[-1][0] is vm.OpCode.hash_xor_final
+            assert step is vm.OpCode.hash_xor_left, (i, step)
+        assert proof[-2] is vm.OpCode.hash_xor_final
 
         # verbose proof
-        for i in range(len(verbose)-1):
+        verbose = vm.decompile(verbose)
+        for i in range(0, len(verbose)-2, 5):
             step = verbose[i]
-            assert vm.OpCode.load_left_hsize in step, (i, step)
+            assert step is vm.OpCode.load_left_hsize, (i, step)
+        assert verbose[-2] is vm.OpCode.hash_xor_final
 
     def test_XorHashTree_verify_executes_without_error_for_valid_proof(self):
         for i in range(2, 300):
@@ -179,7 +179,7 @@ class TestXorHashTree(unittest.TestCase):
             leaf = randint(0, i-1).to_bytes(2, 'big')
             proof = tree.prove(leaf)
             xorhashtree.XorHashTree.verify(tree.root, leaf, proof)
-            xorhashtree.XorHashTree.verify(tree.root, leaf, vm.compile(*proof))
+            xorhashtree.XorHashTree.verify(tree.root, leaf, vm.decompile(proof))
 
     def test_XorHashTree_verify_raises_errors_for_invalid_params(self):
         leaves = [n.to_bytes(2, 'big') for n in range(13)]
@@ -209,6 +209,7 @@ class TestXorHashTree(unittest.TestCase):
         tree = xorhashtree.XorHashTree.from_leaves(leaves)
         leaf = leaves[3]
         proof = tree.prove(leaf)
+        proof = vm.decompile(proof)
 
         result = xorhashtree.XorHashTree.verify(tree.root, leaf, proof, True)
         assert result[0], result[1]
@@ -221,7 +222,7 @@ class TestXorHashTree(unittest.TestCase):
         assert type(result[1][0]) is errors.SecurityError
         assert str(result[1][0]) == 'proof does not reference leaf'
 
-        wrong_proof = proof[1:]
+        wrong_proof = proof[2:]
         result = xorhashtree.XorHashTree.verify(tree.root, leaf, wrong_proof, True)
         assert len(result[1]) == 1
         assert type(result[1][0]) is errors.SecurityError
@@ -231,32 +232,33 @@ class TestXorHashTree(unittest.TestCase):
         assert not xorhashtree.XorHashTree.verify(tree.root, leaf, wrong_proof)
 
         wrong_proof = [*proof]
-        wrong_proof[-1] = wrong_proof[-1][:-4] + (b'\xfe\xed\xbe\xef',)
+        wrong_proof[-1] = wrong_proof[-1][:-4] + b'\xfe\xed\xbe\xef'
         assert not xorhashtree.XorHashTree.verify(tree.root, leaf, wrong_proof)
 
         wrong_proof = [*proof]
-        wrong_proof[1] = (b'\x90',) + wrong_proof[1][1:]
+        wrong_proof = [*wrong_proof[:2], b'\x90', *wrong_proof[2:]]
         result = xorhashtree.XorHashTree.verify(tree.root, leaf, wrong_proof, True)
         assert not result[0]
         assert "expected OpCode" in str(result[1][0]), str(result[1][0])
 
         wrong_proof = [*proof]
-        wrong_proof[1] = wrong_proof[1][:-1] + (b'\x99',)
+        wrong_proof[1] = wrong_proof[1][:-1] + b'\x99'
         assert not xorhashtree.XorHashTree.verify(tree.root, leaf, wrong_proof)
 
     def test_XorHashTree_verify_does_not_validate_malicious_proof(self):
         leaves = [b'leaf0', b'leaf1', b'leaf2']
         tree = xorhashtree.XorHashTree.from_leaves(leaves)
         legit_proof = tree.prove(b'leaf0')
+        legit_proof = vm.decompile(legit_proof)
 
         # first instruction in legit_proof is a load_left operation
-        assert legit_proof[0][0] is vm.OpCode.load_left_hsize
+        assert legit_proof[0] is vm.OpCode.load_left_hsize
 
         # try to trick the validator by inserting malicious leaf then overwriting
         # with the load_left_hsize instruction from the legit_proof, then
         # continuing with the legit_proof
         malicious_proof = [
-            (vm.OpCode.load_left_hsize, sha256(b'malicious leaf').digest()),
+            vm.OpCode.load_left_hsize, sha256(b'malicious leaf').digest(),
             *legit_proof
         ]
 
