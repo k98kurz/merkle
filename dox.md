@@ -2,7 +2,7 @@
 
 Merkleasy is a Python library for Merkle Trees. It consists of a virtual
 machine, a Tree class, an XorHashTree class, and a set of miscellaneous
-functions and other classes. Version 0.1.0.
+functions and other classes. Version 0.1.1.
 
 ## Classes
 

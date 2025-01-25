@@ -1,3 +1,7 @@
+# 0.1.1
+
+- Corrected some documentation.
+
 # 0.1.0
 
 - Added a virtual machine for proof verification.
