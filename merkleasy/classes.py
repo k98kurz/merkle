@@ -220,7 +220,12 @@ class Tree:
         tert(type(proof) in (list, bytes), 'proof must be bytes or list of bytes')
 
         if type(proof) is list:
-            proof = adapt_legacy_proof(proof)
+            try:
+                proof = adapt_legacy_proof(proof)
+            except Exception as e:
+                if report_errors:
+                    return (False, (e,))
+                return False
 
         try:
             decompiled = decompile(proof)

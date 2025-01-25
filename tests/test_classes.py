@@ -193,10 +193,11 @@ class TestMerkle(unittest.TestCase):
             classes.Tree.verify(tree.root, leaf, {'not': 'list'})
         assert str(e.exception) == 'proof must be bytes or list of bytes'
 
-        with self.assertRaises(TypeError) as e:
-            wrong_proof = ['not bytes']
-            classes.Tree.verify(tree.root, leaf, wrong_proof)
-        assert str(e.exception) == 'proof must be bytes or list of bytes'
+        wrong_proof = ['not bytes']
+        result = classes.Tree.verify(tree.root, leaf, wrong_proof, True)
+        assert not result[0]
+        assert type(result[1][0]) is TypeError
+        assert str(result[1][0]) == 'proof must be bytes or list of bytes'
 
     def test_Tree_verify_returns_False_and_errors_for_invalid_proofs(self):
         leaves = [n.to_bytes(3, 'big') for n in range(13)]
