@@ -103,14 +103,13 @@ Raises `ValueError` or `TypeError` upon invalid input.
 To make custom Merklized data structures, use the `__init__` method:
 
 ```py
-from hashlib import sha256
 from merkleasy import Tree
 
-leaf1 = sha256(b'leaf1').digest()
-leaf2 = sha256(b'leaf2').digest()
-leaf3 = sha256(b'leaf3').digest()
-leaf4 = sha256(b'leaf4').digest()
-leaf5 = sha256(b'leaf5').digest()
+leaf1 = b'leaf1'
+leaf2 = b'leaf2'
+leaf3 = b'leaf3'
+leaf4 = b'leaf4'
+leaf5 = b'leaf5'
 another_whole_tree = Tree.from_leaves([b'123', b'456', b'789'])
 
 tree = Tree(
