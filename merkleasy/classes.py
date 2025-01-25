@@ -158,8 +158,8 @@ class Tree:
     def prove(self, leaf: bytes, verbose: bool = False) -> bytes:
         """Create an inclusion proof for a leaf. Use verbose=True to add
             hash checks at each tree level. Raises `TypeError` or
-            `ValueError` upon invalid input. Consists of `OpCode`s and
-            their arguments compiled into bytes.
+            `ValueError` upon invalid input. Return value consists of
+            `OpCode`s and their arguments compiled into bytes.
         """
         tert(type(leaf) is bytes, 'leaf must be bytes')
         leaf_hash = hash_leaf(leaf)
