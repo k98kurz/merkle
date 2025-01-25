@@ -17,12 +17,12 @@ import json
 
 
 class Tree:
-    _root: bytes
-    _parent: Optional[Tree]
-    _left: Tree | bytes
-    _right: Tree | bytes
-    _left_bytes: bytes
-    _right_bytes: bytes
+    root: bytes
+    parent: Optional[Tree]
+    left: Tree | bytes
+    right: Tree | bytes
+    left_bytes: bytes
+    right_bytes: bytes
 
     @property
     def root(self) -> bytes:

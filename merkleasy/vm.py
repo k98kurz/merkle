@@ -588,6 +588,7 @@ def move_to_right(vm: VMProtocol):
     vm.set_register('return', b'')
     vm.debug('move_to_right', result.hex())
 
+
 instruction_set = {
     OpCode.load_left_hsize: load_left_hsize,
     OpCode.load_right_hsize: load_right_hsize,

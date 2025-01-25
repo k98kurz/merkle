@@ -14,12 +14,12 @@ import json
 
 
 class XorHashTree:
-    _root: bytes
-    _parent: Optional[XorHashTree]
-    _left: XorHashTree | bytes
-    _right: XorHashTree | bytes
-    _left_bytes: bytes
-    _right_bytes: bytes
+    root: bytes
+    parent: Optional[XorHashTree]
+    left: XorHashTree | bytes
+    right: XorHashTree | bytes
+    left_bytes: bytes
+    right_bytes: bytes
 
     @property
     def root(self) -> bytes:
@@ -71,10 +71,14 @@ class XorHashTree:
         self._root = xor(get_hash_function()(self.left_bytes), get_hash_function()(self.right_bytes))
 
     def __str__(self) -> str:
+        """Return the root, left, and right in hexadecimal."""
         return f'({self.root.hex()} [{self.left_bytes.hex()}, {self.right_bytes.hex()}])'
 
     def __repr__(self) -> str:
-        return f'({self.root.hex()} [{self.left_bytes.hex()}, {self.right_bytes.hex()}])'
+        """Return the root, left, and right in hexadecimal recursively."""
+        left = self.left.hex() if isinstance(self.left, bytes) else repr(self.left)
+        right = self.right.hex() if isinstance(self.right, bytes) else repr(self.right)
+        return f'({self.root.hex()} [{left}, {right}])'
 
     def __eq__(self, other: object) -> bool:
         return type(other) is XorHashTree and self.root == other.root and \
@@ -84,6 +88,7 @@ class XorHashTree:
         return hash(repr(self))
 
     def to_dict(self) -> dict:
+        """Serialize to a dict."""
         left = self.left.to_dict() if type(self.left) is XorHashTree else self.left.hex()
         right = self.right.to_dict() if type(self.right) is XorHashTree else self.right.hex()
 
@@ -92,12 +97,15 @@ class XorHashTree:
         }
 
     def to_json(self, pretty: bool = False) -> str:
+        """Serialize to json."""
         opts = {} if not pretty else {'indent': '\t'}
         return json.dumps(self.to_dict(), **opts)
 
     @classmethod
     def from_leaves(cls, leaves: list[bytes]) -> XorHashTree:
-        """Return a full tree constructed from the leaves."""
+        """Return a full tree constructed from the leaves. Raises
+            `TypeError` or `ValueError` upon invalid input.
+        """
         tert(type(leaves) in (tuple, list), 'leaves must be tuple or list of bytes')
         vert(len(leaves) >= 2, 'must have at least 2 leaves')
 
@@ -115,7 +123,10 @@ class XorHashTree:
 
     @classmethod
     def from_dict(cls, data: dict) -> XorHashTree:
-        """Deserialize from a dict and return an instance."""
+        """Deserialize from a dict and return an instance. Raises
+            `TypeError`, `ValueError`, or `SecurityError` if the dict
+            does not encode a valid `XorHashTree` instance.
+        """
         tert(type(data) is dict, 'data must be dict type')
         vert(len(data.keys()) == 1, 'data must have one key')
         root = list(data.keys())[0]
@@ -131,7 +142,11 @@ class XorHashTree:
 
     @classmethod
     def from_json(cls, data: str) -> XorHashTree:
-        """Deserialize from json and return an instance."""
+        """Deserialize from json and return an instance. Raises
+            `json.decoder.JSONDecodeError` upon invalid input. Raises
+            `TypeError`, `ValueError`, or `SecurityError` if the JSON
+            does not encode a valid `XorHashTree` instance.
+        """
         return cls.from_dict(json.loads(data))
 
     def prove(self, leaf: bytes, verbose: bool = False) -> bytes:
