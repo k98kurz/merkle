@@ -351,7 +351,7 @@ may have uses in some niche scenarios.)
 
 # Testing
 
-To develop or test, fork or clone the repo and install the dependency.
+To develop or test, fork or clone the repo.
 
 ## Windows Setup
 
@@ -373,7 +373,6 @@ There are several test files. Run them with the following:
 
 ```
 python tests/test_classes.py
-python tests/test_sparse.py
 python tests/test_vm.py
 python tests/test_xorhashtree.py
 ```
@@ -383,6 +382,8 @@ many unintended behaviors. They use `randint` and many repetitions to ensure
 that the test suite is thorough. The tests are also a form of technical
 documentation; any questions about the code can likely be answered by reading
 through them.
+
+There are a total of 52 tests currently for completed features.
 
 There are several additional test files that are a combination of an unfinished
 feature and leftovers from an old project that requires updates. Once those are
